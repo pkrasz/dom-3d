@@ -61,6 +61,8 @@ export const FIXED_COLORS = {
   fire: '#e08a3c', // żar we wkładzie kominka
   mirror: '#d4e0e3',
   screen: '#27313a',
+  terracotta: '#c2704f', // ozdoby na półkach (modele aut, książki)
+  navy: '#3f5873',
 };
 
 // Kolory domyślne nowych typów – ciepła gama „Montana”.
@@ -200,6 +202,37 @@ function cornerSofa(b, w, d, h) {
   }
   b.box(back + 0.16, d - back - 0.5, seatH, back + 0.56, d - back - 0.16, seatH + 0.12, 'second'); // poduszki ozdobne
   b.box(w - arm - 0.5, d - back - 0.3, seatH, w - arm - 0.06, d - back - 0.14, seatH + 0.3, 'second');
+}
+
+/** Wyspa-barek: szafki z frontami od FRONTU, drewniane boki i blat, nawis barowy „over” od TYŁU (strona hokerów). */
+function barIsland(b, w, d, h, over) {
+  const blat = 0.06;
+  const pt = 0.04; // drewniane boki
+  b.box(pt + 0.02, 0.06, 0, w - pt - 0.02, d - over, 0.1, 'dark');
+  b.box(pt, FRONT, 0.1, w - pt, d - over - 0.015, h - blat, 'dark');
+  fronts(b, pt, w - pt, 0.1, h - blat, cl(Math.round((w - 2 * pt) / 0.6), 1, 5), 1, 'main');
+  b.box(pt, d - over - 0.015, 0.1, w - pt, d - over, h - blat, 'main'); // plecy od strony hokerów
+  b.box(0, 0, 0, pt, d, h - blat, 'second');
+  b.box(w - pt, 0, 0, w, d, h - blat, 'second');
+  b.box(0, 0, h - blat, w, d, h, 'second');
+  b.box(pt, d - over * 0.5 - 0.015, 0.22, w - pt, d - over * 0.5 + 0.015, 0.25, 'black'); // podnóżek
+}
+
+/** Podwieszana szafka z blatem i n misami nablatowymi (misa = drugi kolor), czarne wysokie baterie od strony ściany. */
+function vanity(b, w, d, h, n) {
+  const top = h - 0.18; // wierzch blatu; misa 13 cm, bateria 18 cm
+  b.box(0.01, FRONT + 0.01, 0.28, w - 0.01, d, top - 0.04, 'dark'); // szafka podwieszana
+  fronts(b, 0.01, w - 0.01, 0.28, top - 0.04, cl(Math.round(w / 0.7), 1, 3), 1, 'main');
+  b.box(0, 0, top - 0.04, w, d, top, 'main');
+  const r = Math.min(0.2, d * 0.4, (w / n) * 0.4);
+  const cy = d * 0.45;
+  for (let i = 0; i < n; i++) {
+    const x = (w * (i + 0.5)) / n;
+    b.tube(x, cy, r, r, top, top + 0.13, 'second');
+    b.ell(x, cy, r * 0.9, r * 0.9, top, top + 0.035, 'second');
+    b.cyl(x, cy + r + 0.03, 0.014, top, h, 'black'); // bateria wysoka
+    b.box(x - 0.01, cy + 0.04, h - 0.02, x + 0.01, cy + r + 0.03, h, 'black');
+  }
 }
 
 /** Prysznic walk-in: ściany z tyłu i z LEWEJ, tafla od frontu, wejście z prawej. */
@@ -620,19 +653,14 @@ export const CATALOG = [
     id: 'wyspa-barek', name: 'Wyspa-barek z drewnianym blatem', category: 'kuchnia',
     size: { w: 1.8, d: 0.9, h: 0.92 }, range: { w: [1.0, 3.0], d: [0.6, 1.2], h: [0.85, 1.15] },
     color: CASHMERE, color2: OAK, colorNames: ['Fronty', 'Blat i boki'],
-    build(b, w, d, h) {
-      const blat = 0.06;
-      const over = Math.min(0.3, d * 0.33); // nawis barowy
-      const pt = 0.04; // drewniane boki
-      b.box(pt + 0.02, 0.06, 0, w - pt - 0.02, d - over, 0.1, 'dark');
-      b.box(pt, FRONT, 0.1, w - pt, d - over - 0.015, h - blat, 'dark');
-      fronts(b, pt, w - pt, 0.1, h - blat, cl(Math.round((w - 2 * pt) / 0.6), 1, 5), 1, 'main');
-      b.box(pt, d - over - 0.015, 0.1, w - pt, d - over, h - blat, 'main'); // plecy od strony jadalni
-      b.box(0, 0, 0, pt, d, h - blat, 'second');
-      b.box(w - pt, 0, 0, w, d, h - blat, 'second');
-      b.box(0, 0, h - blat, w, d, h, 'second');
-      b.box(pt, d - over * 0.5 - 0.015, 0.22, w - pt, d - over * 0.5 + 0.015, 0.25, 'black'); // podnóżek
-    },
+    build: (b, w, d, h) => barIsland(b, w, d, h, Math.min(0.3, d * 0.33)),
+  },
+  {
+    // mniejsza wyspa wolnostojąca do wąskiej kuchni: ten sam układ co „wyspa-barek” (fronty od FRONTU, nawis na hokery od TYŁU)
+    id: 'wyspa-mala', name: 'Wyspa-barek mała (wolnostojąca)', category: 'kuchnia',
+    size: { w: 1.2, d: 0.7, h: 0.92 }, range: { w: [0.8, 1.6], d: [0.5, 0.9], h: [0.85, 1.1] },
+    color: CASHMERE, color2: OAK, colorNames: ['Fronty', 'Blat i boki'],
+    build: (b, w, d, h) => barIsland(b, w, d, h, Math.min(0.25, d * 0.3)),
   },
   {
     id: 'kuchnia-piekarnik', name: 'Słupek z piekarnikiem', category: 'kuchnia',
@@ -717,22 +745,14 @@ export const CATALOG = [
     id: 'umywalka-nablatowa', name: 'Szafka z umywalką nablatową', category: 'lazienka',
     size: { w: 0.8, d: 0.48, h: 0.95 }, range: { w: [0.5, 1.8], d: [0.4, 0.6], h: [0.85, 1.05] },
     color: OAK, color2: '#f4f4f1', colorNames: ['Szafka i blat', 'Misa'],
-    build(b, w, d, h) {
-      const top = h - 0.18; // wierzch blatu; misa 13 cm, bateria 18 cm
-      b.box(0.01, FRONT + 0.01, 0.28, w - 0.01, d, top - 0.04, 'dark'); // szafka podwieszana
-      fronts(b, 0.01, w - 0.01, 0.28, top - 0.04, cl(Math.round(w / 0.7), 1, 3), 1, 'main');
-      b.box(0, 0, top - 0.04, w, d, top, 'main');
-      const n = w >= 1.3 ? 2 : 1; // dwie misy na szerokim blacie
-      const r = Math.min(0.2, d * 0.4, w * 0.4);
-      const cy = d * 0.45;
-      for (let i = 0; i < n; i++) {
-        const x = (w * (i + 0.5)) / n;
-        b.tube(x, cy, r, r, top, top + 0.13, 'second');
-        b.ell(x, cy, r * 0.9, r * 0.9, top, top + 0.035, 'second');
-        b.cyl(x, cy + r + 0.03, 0.014, top, h, 'black'); // bateria wysoka
-        b.box(x - 0.01, cy + 0.04, h - 0.02, x + 0.01, cy + r + 0.03, h, 'black');
-      }
-    },
+    build: (b, w, d, h) => vanity(b, w, d, h, w >= 1.3 ? 2 : 1), // dwie misy na szerokim blacie
+  },
+  {
+    // zawsze DWIE misy na jednym blacie; misy osobnym kolorem (domyślnie terakota)
+    id: 'umywalka-podwojna', name: 'Podwójna umywalka nablatowa na dębowym blacie', category: 'lazienka',
+    size: { w: 1.4, d: 0.5, h: 0.95 }, range: { w: [1.0, 2.2], d: [0.42, 0.6], h: [0.85, 1.05] },
+    color: OAK, color2: '#c2704f', colorNames: ['Szafka i blat', 'Misy'],
+    build: (b, w, d, h) => vanity(b, w, d, h, 2),
   },
   {
     id: 'prysznic-walk-in', name: 'Prysznic walk-in (ściana z lewej)', category: 'lazienka',
@@ -1341,6 +1361,104 @@ export const CATALOG = [
       b.box(w * 0.08, 0.04, zs[0], w * 0.45, d - 0.04, zs[0] + 0.2, 'jute'); // kosze i pudła
       b.box(w * 0.52, 0.04, zs[1], w * 0.92, d - 0.04, zs[1] + 0.18, 'cream');
       b.box(w * 0.1, 0.04, zs[1], w * 0.42, d - 0.04, zs[1] + 0.22, 'jute');
+    },
+  },
+
+  // ---- runda 2: toaletka, regał z ozdobami, telewizor, szafka RTV
+  {
+    // blat na stałej wysokości 76 cm, pod nim szuflady i wolne miejsce na kolana; lustro stoi na blacie przy TYLE; h = wierzch lustra
+    id: 'toaletka', name: 'Toaletka z lustrem', category: 'sypialnia',
+    size: { w: 1.1, d: 0.45, h: 1.45 }, range: { w: [0.8, 1.6], d: [0.38, 0.55], h: [1.2, 1.7] },
+    color: OAK, color2: LOFT, colorNames: ['Blat i szuflady', 'Nogi i rama lustra'],
+    build(b, w, d, h) {
+      const top = 0.76;
+      const under = top - 0.03; // spód blatu
+      const lt = 0.035; // przekrój nóg
+      b.box(0, 0, under, w, d, top, 'main'); // blat
+      b.box(lt, FRONT, under - 0.14, w - lt, d - 0.02, under, 'dark'); // skrzynia szuflad
+      fronts(b, lt, w - lt, under - 0.14, under, w >= 1.0 ? 3 : 2, 1, 'main');
+      legs(b, w, d, 0, under, lt, 0, 'second');
+      const mw = Math.min(w - 0.2, 0.7); // lustro w ramie
+      const x0 = w / 2 - mw / 2;
+      const x1 = w / 2 + mw / 2;
+      const f = 0.025;
+      b.box(x0, d - 0.035, top, x0 + f, d, h, 'second');
+      b.box(x1 - f, d - 0.035, top, x1, d, h, 'second');
+      b.box(x0 + f, d - 0.035, h - f, x1 - f, d, h, 'second');
+      b.box(x0 + f, d - 0.035, top, x1 - f, d, top + f, 'second');
+      b.box(x0 + f, d - 0.025, top + f, x1 - f, d - 0.005, h - f, 'mirror');
+      b.box(w * 0.07, d * 0.5, top, w * 0.07 + 0.14, d * 0.5 + 0.09, top + 0.06, 'cream'); // szkatułka
+      b.cyl(w * 0.93 - 0.03, d * 0.6, 0.03, top, top + 0.12, 'brass'); // flakon
+    },
+  },
+  {
+    id: 'stolek', name: 'Stołek tapicerowany (do toaletki)', category: 'sypialnia',
+    size: { w: 0.42, d: 0.42, h: 0.46 }, range: { w: [0.35, 0.6], d: [0.35, 0.6], h: [0.4, 0.5] },
+    color: LINEN, color2: OAK, colorNames: ['Siedzisko', 'Nogi'],
+    build(b, w, d, h) {
+      b.ell(w / 2, d / 2, w / 2, d / 2, h - 0.1, h, 'main');
+      for (const x of [w * 0.24, w * 0.76 - 0.03]) for (const y of [d * 0.24, d * 0.76 - 0.03]) b.box(x, y, 0, x + 0.03, y + 0.03, h - 0.1, 'second');
+    },
+  },
+  {
+    // otwarty, płytki regał na ozdoby: modele aut, książki, pudełka; bez pleców – wygląda tak samo z obu stron
+    id: 'regal-dekoracyjny', name: 'Regał dekoracyjny z ozdobami', category: 'biuro',
+    size: { w: 1.2, d: 0.3, h: 1.8 }, range: { w: [0.6, 2.4], d: [0.2, 0.4], h: [0.9, 2.4] },
+    color: OAK, color2: LOFT, colorNames: ['Półki', 'Stelaż'],
+    build(b, w, d, h) {
+      const t = 0.03;
+      legs(b, w, d, 0, h, 0.025, 0, 'second');
+      const n = h >= 1.75 ? 5 : h >= 1.3 ? 4 : 3; // półki razem z najwyższą (wierzch regału)
+      const zs = [];
+      for (let i = 0; i < n; i++) {
+        const z = 0.1 + ((h - 0.1 - t) * i) / (n - 1);
+        zs.push(z + t);
+        b.box(0.005, 0.005, z, w - 0.005, d - 0.005, z + t, 'main');
+      }
+      const cy = d / 2;
+      const car = (x, z, mat) => { // model auta ok. 1:18 – podwozie z kołami, nadwozie, kabina
+        b.box(x + 0.02, cy - 0.046, z, x + 0.18, cy + 0.046, z + 0.024, 'black');
+        b.box(x, cy - 0.04, z + 0.012, x + 0.2, cy + 0.04, z + 0.05, mat);
+        b.box(x + 0.065, cy - 0.035, z + 0.05, x + 0.15, cy + 0.035, z + 0.078, 'screen');
+      };
+      const books = (x, z, m1, m2) => {
+        b.box(x, d * 0.25, z, x + 0.05, d - 0.02, z + 0.24, m1);
+        b.box(x + 0.05, d * 0.3, z, x + 0.11, d - 0.02, z + 0.2, m2);
+      };
+      b.box(w * 0.1, 0.03, zs[0], w * 0.1 + 0.22, d - 0.03, zs[0] + 0.16, 'jute'); // pudełka na dole
+      b.box(w * 0.55, 0.03, zs[0], w * 0.55 + 0.2, d - 0.03, zs[0] + 0.2, 'cream');
+      car(w * 0.1, zs[1], 'terracotta');
+      books(w * 0.62, zs[1], 'navy', 'leafDark');
+      if (n >= 4) {
+        car(w * 0.08, zs[2], 'navy');
+        car(w * 0.55, zs[2], 'cream');
+      }
+      if (n >= 5) books(w * 0.14, zs[3], 'terracotta', 'jute');
+    },
+  },
+  {
+    // płaski ekran na ścianie: ekran od FRONTU, tył przy ścianie; „Od podłogi” = dolna krawędź
+    id: 'telewizor', name: 'Telewizor wiszący', category: 'salon',
+    size: { w: 1.25, d: 0.06, h: 0.72 }, range: { w: [0.7, 2.0], d: [0.04, 0.1], h: [0.4, 1.15] }, color: LOFT,
+    mount: 1.0,
+    build(b, w, d, h) {
+      b.box(0, 0.005, 0, w, d, h, 'main');
+      b.box(0.012, 0, 0.012, w - 0.012, 0.005, h - 0.012, 'screen');
+    },
+  },
+  {
+    id: 'szafka-rtv-loft', name: 'Szafka RTV z drewnianym blatem', category: 'salon',
+    size: { w: 1.6, d: 0.4, h: 0.5 }, range: { w: [0.9, 2.4], d: [0.3, 0.5], h: [0.4, 0.65] },
+    color: WARM_WHITE, color2: OAK, colorNames: ['Fronty', 'Blat i boki'],
+    build(b, w, d, h) {
+      const leg = 0.14;
+      const t = 0.03;
+      legs(b, w, d, 0, leg, 0.03, 0.04, 'black');
+      b.box(t, FRONT, leg, w - t, d, h - t, 'dark');
+      fronts(b, t, w - t, leg, h - t, cl(Math.round(w / 0.6), 2, 4), 1, 'main');
+      b.box(0, 0, leg, t, d, h - t, 'second');
+      b.box(w - t, 0, leg, w, d, h - t, 'second');
+      b.box(0, 0, h - t, w, d, h, 'second');
     },
   },
 ];

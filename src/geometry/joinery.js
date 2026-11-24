@@ -1,8 +1,10 @@
 // Stolarka i glify otworów: ościeża, nadproża i parapety w grubości muru, ramy okien z szybami,
 // balustrady szklane okien do podłogi, drzwi wewnętrzne (ościeżnica + skrzydło otwarte o 90°),
 // drzwi wejściowe z doświetlem i brama garażowa (zamknięte). Wszystko we wspólnych, nieedytowalnych siatkach.
+// Opcja bryły (design.json → doors.sliding): drzwi przesuwne „barn” – gładkie ościeża, skrzydło na szynie (slidingDoors.js).
 import { openingRect, isVertical } from '../../tools/geometry.mjs';
 import { EPS, pointInPolygon, rectCenter } from './plan.js';
+import { slidingDoorsOf, emitSlidingDoor } from './slidingDoors.js';
 import {
   FRAME_DEPTH, FRAME_WIDTH, MULLION_WIDTH, DOOR_FRAME, DOOR_CASING, DOOR_LEAF_THICKNESS, DOOR_LEAF_GAP,
   ENTRANCE_LEAF_THICKNESS, GARAGE_DOOR_THICKNESS, FRENCH_BALCONY_OFFSET, FRENCH_BALCONY_GLASS,
@@ -70,6 +72,13 @@ export function emitReveals(model, batch) {
     const p = axis === 'x' ? [wall.rect[1], wall.rect[3]] : [wall.rect[0], wall.rect[2]];
     emitRevealBox(inner, axis, o.at, p, [floor + o.sill, floor + o.sill + o.height], { sill: false });
   }
+
+  // drzwi przesuwne nie mają ościeżnicy – ościeża i spód nadproża są gładkie, w kolorze ściany
+  for (const d of slidingDoorsOf(model.house, model.design, level.id).values()) {
+    const o = d.opening;
+    const p = d.axis === 'x' ? [d.wall.rect[1], d.wall.rect[3]] : [d.wall.rect[0], d.wall.rect[2]];
+    emitRevealBox(inner, d.axis, o.at, p, [floor + o.sill, floor + o.sill + o.height], { sill: false });
+  }
 }
 
 /** Rama okna z szybą w otworze ściany zewnętrznej. */
@@ -107,6 +116,7 @@ export function emitJoinery(house, model, batch) {
   const leaf = batch('door', 'joinery', level.id);
   const cornersDone = new Set();
   const fb = level.frenchBalconies;
+  const sliding = slidingDoorsOf(house, model.design, level.id);
 
   // Bryła stolarki + jej ciemny przekrój w widoku z góry (tam, gdzie przecina ją płaszczyzna cięcia).
   const section = batch('sectionCap', 'cap', level.id, { cap: 'section' });
@@ -171,6 +181,15 @@ export function emitJoinery(house, model, batch) {
 
     if (o.kind === 'garageDoor') {
       solid(doorExt, info.axis, o.at[0], o.at[1], info.m, info.m - info.out * GARAGE_DOOR_THICKNESS, zA, zB);
+      continue;
+    }
+
+    if (o.kind === 'door' && sliding.has(o.id)) {
+      emitSlidingDoor(sliding.get(o.id), {
+        leaf: batch('barnDoor', 'joinery', level.id),
+        rail: batch('barnRail', 'joinery', level.id),
+        solid,
+      });
       continue;
     }
 

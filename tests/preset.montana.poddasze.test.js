@@ -1,6 +1,7 @@
 // Wariant „Montana” – poddasze: twarde wymagania aranżacji sprawdzone liczbowo na prawdziwym house.json + design.json.
 // Meble: pomieszczenie, ściany (te same funkcje co aplikacja – features/furniture/placement.js), drzwi, okna do podłogi,
-// nakładanie, wysokość pod skosem i belkami, przejścia 80 cm, dojście do mebli. Wykończenia: znane materiały i powierzchnie.
+// nakładanie, wysokość pod skosem i belkami, przejścia 80 cm, dojście do mebli, drzwi przesuwne (tor skrzydła), dodatkowe
+// okna połaciowe, wolne miejsce przy sanitariatach. Wykończenia: znane materiały i powierzchnie.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildHouse } from '../src/geometry/buildHouse.js';
@@ -78,9 +79,15 @@ const doors = level.openings.filter((o) => o.kind === 'door');
 const passages = level.openings.filter((o) => o.kind === 'passage');
 const frenchWindows = level.openings.filter((o) => o.kind === 'frenchWindow');
 const PASS_DEPTH = 0.8; // wolne przejście przed drzwiami po stronie bez skrzydła
-/** Strefy, w których nie może stać nic poza dywanem: łuk skrzydła (kwadrat leaf + 3 cm) i 80 cm po drugiej stronie. */
+/** Drzwi przesuwne z design.json (skrzydło jeździ po ścianie – nie ma łuku, za to pas keepClear przy ścianie). */
+const sliding = collision.slidingDoors(LEVEL);
+const slidingIds = new Set(sliding.map((d) => d.id));
+/**
+ * Strefy, w których nie może stać nic poza dywanem: łuk skrzydła (kwadrat leaf + 3 cm) i 80 cm po drugiej stronie;
+ * przy drzwiach przesuwnych i przejściach 80 cm po obu stronach otworu.
+ */
 function doorZones(o) {
-  const sign = o.swing ? (o.swing[0] === '+' ? 1 : -1) : 0;
+  const sign = o.swing && !slidingIds.has(o.id) ? (o.swing[0] === '+' ? 1 : -1) : 0;
   const swingDepth = (o.leaf || o.width) + 0.03;
   if (!sign) return [zoneBeside(o, 1, PASS_DEPTH), zoneBeside(o, -1, PASS_DEPTH)];
   return [zoneBeside(o, sign, swingDepth), zoneBeside(o, -sign, PASS_DEPTH)];
@@ -189,7 +196,9 @@ describe('Montana – poddasze: meble', () => {
   });
 
   it('meble z projektu: te same id, położenie i wymiary co createStarterFurniture()', () => {
-    const starter = createStarterFurniture().filter((f) => f.levelId === LEVEL);
+    // wyjątek na życzenie właściciela: zabudowa w sypialni 1/9 usunięta (w jej miejscu toaletka)
+    const starter = createStarterFurniture().filter((f) => f.levelId === LEVEL && f.id !== 'start-szafa-1-9');
+    expect(starter).toHaveLength(9);
     const mine = furniture.filter((f) => f.id.startsWith('start-'));
     expect(mine.map((f) => f.id).sort()).toEqual(starter.map((f) => f.id).sort());
     for (const s of starter) {
@@ -215,6 +224,46 @@ describe('Montana – poddasze: meble', () => {
     }
   });
 
+  it('drzwi przesuwne: tor skrzydła przy ścianie wolny od wszystkiego (także mebli wiszących), otwór wolny z obu stron', () => {
+    expect(sliding.map((d) => d.id).sort()).toEqual(['DP1', 'DP2']);
+    for (const d of sliding) {
+      expect(d.roomId).toBe('1/9');
+      const k = d.keepClear;
+      const zone = [k[0] + 0.001, k[1] + 0.001, k[2] - 0.001, k[3] - 0.001];
+      for (const f of furniture) if (!isRug(f)) expect(overlapsRect(f, zone), `${f.id} w torze skrzydła ${d.id}`).toBe(false);
+      expect(d.clearWidth).toBeGreaterThanOrEqual(0.8);
+      // strefy 80 cm po obu stronach otworu sprawdza test wyżej (doorZones) – tu kontrola, że obejmuje drzwi przesuwne
+      expect(doorZones(d.opening)).toHaveLength(2);
+      for (const z of doorZones(d.opening)) expect(Math.min(z[2] - z[0], z[3] - z[1])).toBeCloseTo(PASS_DEPTH, 6);
+    }
+  });
+
+  it('dodatkowe okna połaciowe (pokoje dzieci): pod oknem tylko niskie meble, łóżeczko i łóżko-domek poza oknem', () => {
+    const extra = design.extraRoofWindows.windows;
+    expect(extra.map((w) => w.room).sort()).toEqual(['1/4', '1/5', '1/8']);
+    for (const w of extra) {
+      // rzut okna w połaci razem z otworem w okładzinie skosu (szpalet prostopadły do połaci): 1,21 m od lica ścianki kolankowej
+      const zone = w.slope === 'skos-S' ? [w.x[0], 0.25, w.x[1], 1.461] : [w.x[0], 8.639, w.x[1], 9.85];
+      const under = furniture.filter((f) => !isRug(f) && overlapsRect(f, zone));
+      for (const f of under) {
+        expect(roomOf(f), `${f.id} pod oknem ${w.id}`).toBe(w.room);
+        expect((f.z || 0) + f.h, `${f.id} zasłania okno ${w.id} (dół otworu 1,60 m)`).toBeLessThanOrEqual(1.2);
+        expect(['lozeczko', 'lozko-domek'], `${f.id} pod oknem ${w.id}`).not.toContain(f.type);
+      }
+    }
+  });
+
+  it('lamele przy schodach: wyjście z biegu górnego na korytarz i pas wzdłuż lameli są wolne', () => {
+    const slats = solidWalls.filter((w) => w.kind === 'balustrade');
+    expect(slats.length).toBe(3);
+    const stand = inRoom('1/2').filter((f) => !isRug(f) && !isHanging(f));
+    const exit = [7.94, 4.82, 7.94 + 0.9, 5.8]; // przed krawędzią x = 7,92 (wyjście ze schodów), 90 cm w głąb korytarza
+    for (const f of stand) expect(overlapsRect(f, exit), `${f.id} w wyjściu ze schodów`).toBe(false);
+    for (const f of stand) expect(collides(f, slats), `${f.id} w lamelach`).toBe(false);
+    // korytarz wzdłuż lameli (y 3,52..4,78) – bez mebli stojących na całej szerokości
+    for (const f of stand) expect(overlapsRect(f, [5.3, 3.52, 7.92, 4.78]), f.id).toBe(false);
+  });
+
   it('nic nie stoi przed oknem do podłogi (pas 60 cm; dywan może)', () => {
     expect(frenchWindows.length).toBe(4);
     for (const o of frenchWindows) {
@@ -233,7 +282,7 @@ describe('Montana – poddasze: meble', () => {
         if (isRug(a) || isRug(b)) continue;
         const [a0, a1] = [a.z || 0, (a.z || 0) + a.h];
         const [b0, b1] = [b.z || 0, (b.z || 0) + b.h];
-        if (a1 <= b0 + 1e-9 || b1 <= a0 + 1e-9) continue; // jeden w całości nad drugim
+        if (a1 <= b0 + 1e-9 || b1 <= a0 + 1e-9) continue; // jeden w całości nad drugim (lustro, półka nad niższym meblem)
         expect(rectsOverlap(aabb(a), aabb(b)), `${a.id} × ${b.id}`).toBe(false);
       }
     }
@@ -319,43 +368,122 @@ describe('Montana – poddasze: meble', () => {
     expect(inRoom('1/9').filter((f) => f.type === 'szafka-nocna').length).toBe(2);
   });
 
-  it('biuro: miejsce na rozłożenie kanapy – 2,00 m głębokości na szerokości ≥ 1,05 m, reszta szerokości ≥ 1,50 m', () => {
-    // Pełne 1,40 × 2,00 m nie mieści się razem z biurkiem i przejściem 80 cm od drzwi (patrz komentarz w danych):
-    // krzesło biurowe i dywan się nie liczą (krzesło się odsuwa).
-    const sofa = furniture.find((f) => f.type === 'kanapa-rozkladana');
-    const desk = furniture.find((f) => f.type === 'biurko-komputerowe');
-    const [x0, y0, , y1] = aabb(sofa); // stoi tyłem do ściany wschodniej – rozkłada się w stronę −x
-    expect(sofa.rot).toBe(270);
-    expect(y1 - y0).toBeGreaterThanOrEqual(1.3);
-    const deskFront = aabb(desk)[1];
-    const deskEnd = aabb(desk)[2];
-    expect(deskFront - y0).toBeGreaterThanOrEqual(1.05 - 1e-9);
-    expect(x0 - deskEnd).toBeGreaterThanOrEqual(1.5);
-    const zones = [[x0 - 2.0, y0, x0, deskFront], [deskEnd, deskFront, x0, y1]];
-    for (const zone of zones) {
-      const probe = { x: (zone[0] + zone[2]) / 2, y: (zone[1] + zone[3]) / 2, rot: 0, w: zone[2] - zone[0] - 0.01, d: zone[3] - zone[1] - 0.01 };
-      expect(collides(probe, blockers)).toBe(false);
-      for (const [x, y] of corners(probe)) expect(collision.pointInRoom(LEVEL, x, y)).toBe('1/3');
+  it('biuro: regał z ozdobami za plecami siedzącego, telewizor na licu szaf, miejsce na rozłożenie kanapy', () => {
+    const get = (type) => inRoom('1/3').find((f) => f.type === type);
+    const sofa = get('kanapa-rozkladana');
+    const desk = get('biurko-komputerowe');
+    const chair = get('krzeslo-biurowe');
+    const shelf = get('regal-dekoracyjny');
+    const tv = get('telewizor');
+    for (const f of [sofa, desk, chair, shelf, tv]) expect(f).toBeTruthy();
+
+    // stanowisko: biurko – krzesło – regał w jednej linii (wzdłuż x), regał przy ścianie D-8 za oparciem krzesła
+    const [dk, ch, sh] = [aabb(desk), aabb(chair), aabb(shelf)];
+    expect(desk.rot).toBe(90); // tył biurka na zachód, siedzący od wschodu
+    expect(chair.rot).toBe(270); // oparcie krzesła w stronę regału
+    expect(shelf.rot).toBe(270);
+    expect(sh[2]).toBeCloseTo(9.41, 6); // lico ściany D-8
+    expect(ch[0]).toBeGreaterThanOrEqual(dk[2] - 1e-9);
+    expect(sh[0]).toBeGreaterThanOrEqual(ch[2] - 1e-9);
+    expect(sh[0] - dk[2], 'miejsce na krzesło między biurkiem a regałem').toBeGreaterThanOrEqual(0.75);
+    expect(sh[0] - ch[2], 'regał tuż za krzesłem').toBeLessThanOrEqual(0.3);
+    expect(Math.min(ch[3], sh[3]) - Math.max(ch[1], sh[1]), 'regał za całym krzesłem').toBeGreaterThanOrEqual(chair.w * 0.8);
+    expect(chair.y).toBeGreaterThan(dk[1]);
+    expect(chair.y).toBeLessThan(dk[3]);
+    expect(shelf.h, 'pięć półek z ozdobami').toBeGreaterThanOrEqual(1.75);
+
+    // telewizor wisi na licu zabudowy z projektu (szafa B), naprzeciw kanapy
+    const closet = aabb(furniture.find((f) => f.id === 'start-szafa-1-3-b'));
+    const t = aabb(tv);
+    expect(t[1]).toBeCloseTo(closet[3], 3);
+    expect(t[0]).toBeGreaterThanOrEqual(closet[0]);
+    expect(t[2]).toBeLessThanOrEqual(closet[2]);
+    expect(tv.rot).toBe(180);
+    const s = aabb(sofa);
+    expect(sofa.rot).toBe(0); // tyłem do ścianki kolankowej, przodem do telewizora
+    expect(tv.x).toBeGreaterThan(s[0]);
+    expect(tv.x).toBeLessThan(s[2]);
+
+    // KOMPROMIS (opisany w danych): pełne 1,40 × 2,00 m wolnej podłogi przed kanapą się nie mieści.
+    // Pilnujemy tego, co jest: przed kanapą wolne ≥ 1,40 × 1,30 m aż do lica szaf, a łóżko 1,40 × 2,00 m
+    // liczone od ścianki kolankowej (razem z kanapą) nie trafia w żaden mebel stojący – także w krzesło.
+    expect(s[2] - s[0]).toBeGreaterThanOrEqual(1.4 - 1e-9);
+    expect(s[3]).toBeCloseTo(9.85, 6);
+    const front = [s[0], closet[3], s[2], s[1]];
+    expect(front[3] - front[1]).toBeGreaterThanOrEqual(1.3);
+    const bed = [s[0], s[3] - 2.0, s[2], s[3]];
+    expect(bed[1] - closet[3], 'zapas między rozłożonym łóżkiem a szafami').toBeGreaterThanOrEqual(0.15);
+    for (const zone of [front, bed]) {
+      const z = [zone[0] + 0.005, zone[1] + 0.005, zone[2] - 0.005, zone[3] - 0.005];
       for (const f of inRoom('1/3')) {
-        if (f === sofa || isRug(f) || isHanging(f) || f.type === 'krzeslo-biurowe') continue;
-        expect(overlapsRect(f, [zone[0] + 0.005, zone[1] + 0.005, zone[2] - 0.005, zone[3] - 0.005]), `${f.id} w miejscu na rozłożenie kanapy`).toBe(false);
+        if (f === sofa || isRug(f) || isHanging(f)) continue;
+        expect(overlapsRect(f, z), `${f.id} w miejscu na rozłożenie kanapy`).toBe(false);
       }
     }
   });
 
+  it('łazienki: 60 cm wolnego przed WC, bidetem i umywalkami; wejście do prysznica min. 60 cm', () => {
+    const FRONT = 0.6;
+    const fixtures = furniture.filter((f) => ['wc-podwieszane', 'bidet', 'umywalka-nablatowa', 'umywalka-podwojna', 'umywalka'].includes(f.type));
+    expect(fixtures.length).toBe(6); // 1/7: WC, bidet, umywalki; 1/10: WC, umywalka; pralnia: umywalka
+    /** Prostokąt głębokości depth przyległy do boku mebla: 'front' (−y lokalnie) albo 'left' / 'right' (patrząc od frontu). */
+    const beside = (f, side, depth) => {
+      const [lx, ly, w, d] = side === 'front' ? [0, -(f.d + depth) / 2, f.w, depth] : [(side === 'right' ? 1 : -1) * (f.w + depth) / 2, 0, depth, f.d];
+      const a = (f.rot * Math.PI) / 180;
+      return aabb({ x: f.x + lx * Math.cos(a) - ly * Math.sin(a), y: f.y + lx * Math.sin(a) + ly * Math.cos(a), rot: f.rot, w, d });
+    };
+    const freeZone = (zone, self, label) => {
+      const z = [zone[0] + 0.005, zone[1] + 0.005, zone[2] - 0.005, zone[3] - 0.005];
+      const probe = { x: (z[0] + z[2]) / 2, y: (z[1] + z[3]) / 2, rot: 0, w: z[2] - z[0], d: z[3] - z[1] };
+      expect(collides(probe, blockers), `${label}: ściana`).toBe(false);
+      for (const [x, y] of corners(probe)) expect(collision.pointInRoom(LEVEL, x, y), label).toBe(roomOf(self));
+      for (const f of inRoom(roomOf(self))) {
+        if (f === self || isRug(f) || isHanging(f)) continue;
+        expect(overlapsRect(f, z), `${label}: ${f.id}`).toBe(false);
+      }
+    };
+    for (const f of fixtures) freeZone(beside(f, 'front', FRONT), f, `przed ${f.id}`);
+    // walk-in „prawy”: ściana z prawej, wejście z lewej strony (patrząc od frontu) – tam 60 cm wolnego na całej głębokości
+    const showers = furniture.filter((f) => f.type === 'prysznic-walk-in-prawy');
+    expect(showers.map(roomOf).sort()).toEqual(['1/10', '1/7']);
+    for (const f of showers) freeZone(beside(f, 'left', FRONT), f, `wejście do ${f.id}`);
+    // przed wanną wolny pas 60 cm na co najmniej 1 m jej długości (wejście do wanny)
+    const tub = furniture.find((f) => f.type === 'wanna-wolnostojaca');
+    const t = aabb(tub);
+    freeZone([t[0], t[3], t[0] + 1.0, t[3] + FRONT], tub, 'przed wanną');
+  });
+
   it('wyposażenie z życzeń właściciela jest na miejscu', () => {
     const types = (roomId) => inRoom(roomId).map((f) => f.type);
-    expect(types('1/3')).toEqual(expect.arrayContaining(['biurko-komputerowe', 'krzeslo-biurowe', 'kanapa-rozkladana', 'regal', 'szafa-wnekowa']));
+    expect(types('1/3')).toEqual(expect.arrayContaining(['biurko-komputerowe', 'krzeslo-biurowe', 'kanapa-rozkladana', 'regal-dekoracyjny', 'telewizor', 'szafa-wnekowa']));
+    expect(inRoom('1/3').filter((f) => f.type === 'szafa-wnekowa')).toHaveLength(3); // zabudowy z projektu zostają
     expect(types('1/4')).toEqual(expect.arrayContaining(['lozko-120', 'biurko', 'krzeslo-biurowe', 'regal', 'szafa-wnekowa']));
     expect(types('1/5')).toEqual(expect.arrayContaining(['lozko-domek', 'regal-zabawki', 'stolik-dzieciecy', 'komoda', 'dywan-okragly']));
     expect(types('1/8')).toEqual(expect.arrayContaining(['lozeczko', 'komoda-przewijak', 'fotel-uszak', 'regal-zabawki', 'dywan-okragly']));
-    expect(types('1/9')).toEqual(expect.arrayContaining(['lozko-160', 'szafka-nocna', 'dywan', 'fotel-uszak', 'szafa-wnekowa']));
+    expect(types('1/9')).toEqual(expect.arrayContaining(['lozko-160', 'szafka-nocna', 'dywan', 'toaletka', 'stolek']));
+    // sypialnia bez szafy z projektu i bez fotela; toaletka stoi w miejscu szafy (ściana N-1), stołek przed nią
+    expect(types('1/9').some((t) => t.startsWith('szafa') || t.startsWith('fotel'))).toBe(false);
+    expect(furniture.some((f) => f.id === 'start-szafa-1-9')).toBe(false);
+    const vanityTable = furniture.find((f) => f.type === 'toaletka');
+    const stool = furniture.find((f) => f.type === 'stolek');
+    const oldCloset = createStarterFurniture().find((f) => f.id === 'start-szafa-1-9');
+    const [v, c, st] = [aabb(vanityTable), aabb(oldCloset), aabb(stool)];
+    expect(v[2]).toBeCloseTo(c[2], 6); // przy tej samej ścianie
+    expect(v[1]).toBeGreaterThanOrEqual(c[1]);
+    expect(v[3]).toBeLessThanOrEqual(c[3]);
+    expect(vanityTable.rot).toBe(270); // tył z lustrem przy ścianie, siada się od strony pokoju
+    expect(v[0] - st[2]).toBeGreaterThanOrEqual(0);
+    expect(v[0] - st[2]).toBeLessThanOrEqual(0.1);
+    expect(stool.y).toBeGreaterThan(v[1]);
+    expect(stool.y).toBeLessThan(v[3]);
     expect(types('1/10')).toEqual(expect.arrayContaining(['umywalka-nablatowa', 'prysznic-walk-in-prawy', 'lustro', 'wc-podwieszane']));
     expect(types('1/10').some((t) => t.startsWith('wanna'))).toBe(false);
-    expect(types('1/7')).toEqual(expect.arrayContaining(['wanna-wolnostojaca', 'prysznic-walk-in-prawy', 'wc-podwieszane', 'bidet', 'umywalka-nablatowa']));
-    const basin = furniture.find((f) => f.id === 'mt-1-7-umywalka');
-    expect(basin.color2).toBe('#c2704f'); // misa w kolorze terakoty
-    expect(basin.w).toBeLessThan(1.3); // jedna misa (dwie od 1,30 m – nie mieszczą się, patrz raport)
+    expect(types('1/7')).toEqual(expect.arrayContaining(['wanna-wolnostojaca', 'prysznic-walk-in-prawy', 'wc-podwieszane', 'bidet', 'umywalka-podwojna', 'lustro']));
+    const basin = furniture.find((f) => f.id === 'mt-1-7-umywalki');
+    expect(basin.type).toBe('umywalka-podwojna'); // zawsze DWIE misy na jednym blacie
+    expect(basin.color).toBe('#b5895a'); // dębowy blat
+    expect(basin.color2).toBe('#c2704f'); // misy w kolorze terakoty
+    for (const id of ['mt-1-7-wc', 'mt-1-7-bidet']) expect(furniture.find((f) => f.id === id).color).toBe('#f4f4f1'); // biała ceramika
     // prysznice stoją w narożniku: tył i prawy bok przy ścianie (typ „prawy”)
     for (const s of furniture.filter((f) => f.type === 'prysznic-walk-in-prawy')) {
       const cs = corners(s); // [lewy-front, prawy-front, prawy-tył, lewy-tył]
@@ -408,8 +536,16 @@ describe('Montana – poddasze: wykończenia', () => {
     for (const roomId of ['1/2', '1/3', '1/4', '1/5', '1/8', '1/9', '1/11']) expect(idOf(`${LEVEL}:${roomId}:floor`), roomId).toBe('panel-dab-cieply');
     for (const roomId of ['1/6', '1/7', '1/10']) expect(materialById.get(idOf(`${LEVEL}:${roomId}:floor`)).category, roomId).toBe('gres');
     expect(idOf(`${LEVEL}:1/7:floor`)).toBe('lastryko-cieple');
-    expect(idOf(`${LEVEL}:1/7:wall:1`)).toBe('lastryko-cieple'); // ściana przy umywalce
-    expect(idOf(`${LEVEL}:1/7:wall:3`)).toBe('plytka-terakota-30x60'); // ściana prysznica
+    expect(idOf(`${LEVEL}:1/7:wall:1`)).toBe('lastryko-cieple'); // ściana przy umywalkach
+    // terakota TYLKO na ścianie prysznica (tył walk-in), pozostałe dwie ściany w ciepłej bieli
+    const terracotta = [0, 1, 2, 3].filter((i) => String(idOf(`${LEVEL}:1/7:wall:${i}`)).startsWith('plytka-terakota'));
+    expect(terracotta).toEqual([3]);
+    for (const i of [0, 2]) expect(finishes[`${LEVEL}:1/7:wall:${i}`]).toEqual({ kind: 'paint', color: '#f6f1e7' });
+    const shower = furniture.find((f) => f.id === 'mt-1-7-prysznic');
+    const basins = furniture.find((f) => f.id === 'mt-1-7-umywalki');
+    const wallX = (i) => { const m = built.surfaces.get(`${LEVEL}:1/7:wall:${i}`).mesh; m.geometry.computeBoundingBox(); return m.geometry.boundingBox.max.x; };
+    expect(corners(shower)[2][0]).toBeCloseTo(wallX(3), 2); // tył prysznica przy ścianie w terakocie
+    expect(aabb(basins)[2]).toBeCloseTo(wallX(1), 2); // umywalki przy ścianie z lastryka
     expect(idOf(`${LEVEL}:1/10:floor`)).toBe('patchwork-szaro-niebieski');
     const brick = [0, 1, 2, 3].filter((i) => idOf(`${LEVEL}:1/10:wall:${i}`) === 'cegla-stara-czerwona');
     expect(brick).toEqual([3]); // dokładnie jedna ściana w cegle

@@ -4,7 +4,8 @@
 // Układ współrzędnych jak w house.json (metry). Mebel: środek (x, y), obrót rot w stopniach;
 // przy rot = 0 front patrzy w stronę −y, tył w +y (90 = tył na zachód, 180 = na południe, 270 = na wschód).
 // Identyfikatory: „mt-pN-…” = pomieszczenie 0/N; meble z projektu (szafa w wiatrołapie, kominek) mają id ze starter.js.
-// Twarde wymagania (ściany, drzwi, przejścia, nakładanie) pilnuje tests/preset.montana.parter.test.js.
+// Bryła z design.json: drzwi spiżarni przesuwne po stronie kuchni (pas 12,5 cm przy ścianie x = 5,30, y 7,56..9,25 wolny).
+// Twarde wymagania (ściany, drzwi rozwierne i przesuwne, przejścia, nakładanie) pilnuje tests/preset.montana.parter.test.js.
 
 const P = 'parter';
 
@@ -35,14 +36,14 @@ export const finishes = {
   // --- 0/1 Wiatrołap: patchwork biało-czarny, ściana boczna (wschodnia, bez szafy) w starej cegle
   'parter:0/1:floor': material('patchwork-bialo-czarny'),
   'parter:0/1:wall:0': farba(BIEL_ZLAMANA), // południowa, z drzwiami wejściowymi
-  'parter:0/1:wall:1': material('cegla-stara-czerwona'), // wschodnia (ściana W3 od salonu) – przy niej siedzisko
+  'parter:0/1:wall:1': material('cegla-stara-czerwona'), // wschodnia (ściana W3 od salonu) – przy niej siedzisko i konsola
   'parter:0/1:wall:2': farba(BIEL_ZLAMANA), // północna – szafa wnękowa, dalej ścianka szklana
   'parter:0/1:wall:3': farba(BIEL_ZLAMANA), // zachodnia, z drzwiami do garażu
   'parter:0/1:ceiling': farba(BIEL_CIEPLA),
 
   // --- 0/2 Korytarz
   'parter:0/2:floor': JODELKA,
-  'parter:0/2:wall:1': farba(BIEL_CIEPLA), // wschodnia (W3) z konsolą + pas podciągu nad otwarciem na salon
+  'parter:0/2:wall:1': farba(BIEL_CIEPLA), // wschodnia (W3) + pas podciągu nad otwarciem na salon
   'parter:0/2:wall:2': farba(BIEL_CIEPLA),
   'parter:0/2:wall:5': material('tynk-strukturalny-jasny'), // ściana nośna pod schodami – biegnie w górę klatki
   'parter:0/2:wall:6': farba(BIEL_CIEPLA), // pod schodami, od łazienki
@@ -69,9 +70,9 @@ export const finishes = {
 
   // --- 0/5 Kuchnia: bielona cegła na ścianie okiennej (nad blatem), reszta ciepła
   'parter:0/5:floor': JODELKA,
-  'parter:0/5:wall:0': farba(KOSC_SLONIOWA), // południowa – wysoka zabudowa, dalej wolna ściana przy wejściu
+  'parter:0/5:wall:0': farba(KOSC_SLONIOWA), // południowa – wysoka zabudowa i blat pomocniczy, dalej wolna ściana przy przejściu
   'parter:0/5:wall:2': material('cegla-bielona'), // północna, z oknem – zlew i płyta
-  'parter:0/5:wall:3': farba(BIEL_CIEPLA), // zachodnia, z drzwiami spiżarni
+  'parter:0/5:wall:3': farba(BIEL_CIEPLA), // zachodnia, z przesuwnymi drzwiami spiżarni (pas przy ścianie wolny na skrzydło)
   'parter:0/5:ceiling': farba(BIEL_CIEPLA),
 
   // --- 0/6 Salon z jadalnią: ściana RTV w beżowym tynku, komin w ciepłym kamieniu
@@ -116,19 +117,20 @@ export const furniture = [
   // ============ 0/1 Wiatrołap (3,50 × 1,80)
   // szafa wnękowa z projektu – na swoim miejscu, ciepła biel
   { id: 'start-szafa-wiatrolap', type: 'szafa-wnekowa', levelId: P, x: 5.9, y: 2.35, rot: 0, w: 1.2, d: 0.6, h: 2.4, color: BIEL_MEBLI },
-  // ścianka szklana w przejściu P1 (1,98 × 2,70 – pełna wysokość), drzwi dwuskrzydłowe 2 × 90 cm; 2 mm luzu na ościeża
+  // ścianka szklana w przejściu P1 (1,98 × 2,70 – pełna wysokość), drzwi dwuskrzydłowe 2 × 90 cm; 2 mm luzu na ościeża.
+  // ZAŁOŻENIE: skrzydła otwierają się do korytarza (+y) – dzięki temu ceglana ściana wiatrołapu mieści siedzisko i konsolę.
   { id: 'mt-p1-scianka-szklana', type: 'scianka-szklana-drzwi', levelId: P, x: 7.81, y: 2.71, rot: 0, w: 1.978, d: 0.08, h: 2.7, color: CZARNY },
   // siedzisko przy ceglanej ścianie, na prawo od wejścia; nad nim listwa z hakami
-  { id: 'mt-p1-siedzisko', type: 'siedzisko', levelId: P, x: 8.61, y: 1.3, rot: 270, w: 0.85, d: 0.38, h: 0.46, color: DAB, color2: BIEL_MEBLI },
-  { id: 'mt-p1-wieszak', type: 'wieszak', levelId: P, x: 8.76, y: 1.3, rot: 270, w: 0.8, d: 0.08, h: 0.14, color: DAB, z: 1.6 },
+  { id: 'mt-p1-siedzisko', type: 'siedzisko', levelId: P, x: 8.61, y: 1.27, rot: 270, w: 0.8, d: 0.38, h: 0.46, color: DAB, color2: BIEL_MEBLI },
+  { id: 'mt-p1-wieszak', type: 'wieszak', levelId: P, x: 8.76, y: 1.27, rot: 270, w: 0.8, d: 0.08, h: 0.14, color: DAB, z: 1.6 },
+  // konsola z dębowym blatem W WIATROŁAPIE – dalej na tej samej ceglanej ścianie, przy ściance szklanej; nad nią okrągłe lustro w czarnej ramie
+  { id: 'mt-p1-konsola', type: 'konsola', levelId: P, x: 8.66, y: 2.18, rot: 270, w: 0.8, d: 0.28, h: 0.8, color: DAB, color2: CZARNY },
+  { id: 'mt-p1-lustro-konsola', type: 'lustro-okragle', levelId: P, x: 8.78, y: 2.18, rot: 270, w: 0.65, d: 0.04, h: 0.65, color: CZARNY, z: 1.05 },
   // wysokie lustro w czarnej ramie na ścianie przy drzwiach wejściowych (4 cm – nie wchodzi w łuk drzwi z garażu)
   { id: 'mt-p1-lustro', type: 'lustro', levelId: P, x: 5.95, y: 0.87, rot: 180, w: 0.6, d: 0.04, h: 1.6, color: CZARNY, z: 0.35 },
   { id: 'mt-p1-dywan', type: 'dywan-okragly', levelId: P, x: 7.45, y: 1.7, rot: 0, w: 1.4, d: 1.4, h: 0.015, color: JUTA },
 
-  // ============ 0/2 Korytarz
-  // konsola z dębowym blatem tuż za ścianką szklaną (w wiatrołapie nie ma na nią ściany) + okrągłe lustro
-  { id: 'mt-p2-konsola', type: 'konsola', levelId: P, x: 8.66, y: 3.27, rot: 270, w: 0.9, d: 0.28, h: 0.8, color: DAB, color2: CZARNY },
-  { id: 'mt-p2-lustro', type: 'lustro-okragle', levelId: P, x: 8.78, y: 3.27, rot: 270, w: 0.7, d: 0.04, h: 0.7, color: CZARNY, z: 1.05 },
+  // ============ 0/2 Korytarz: pusty ciąg komunikacyjny (za ścianką szklaną otwierają się jej skrzydła)
   // roślina w otwartej wnęce pod biegiem górnym schodów (poza ciągiem komunikacyjnym)
   { id: 'mt-p2-roslina', type: 'roslina', levelId: P, x: 7.05, y: 5.15, rot: 0, w: 0.45, d: 0.45, h: 1.3, color: '#d9cdb8' },
 
@@ -142,27 +144,27 @@ export const furniture = [
   { id: 'mt-p4-regal-polnoc', type: 'regal-magazynowy', levelId: P, x: 4.065, y: 9.65, rot: 0, w: 1.966, d: 0.4, h: 2.2, color: DAB, color2: CZARNY },
   { id: 'mt-p4-regal-wschod', type: 'regal-magazynowy', levelId: P, x: 4.9, y: 7.75, rot: 270, w: 1.2, d: 0.3, h: 2.2, color: DAB, color2: CZARNY },
 
-  // ============ 0/5 Kuchnia (3,75 × 2,80): dwa rzędy + wyspa-barek na granicy z jadalnią
-  // rząd północny pod oknem (blat 0,90 ≤ parapet 0,91): szafka, płyta, szafka, zlew pod oknem, szafka
-  { id: 'mt-p5-dolna-1', type: 'kuchnia-dolna', levelId: P, x: 5.65, y: 9.55, rot: 0, w: 0.7, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-plyta', type: 'kuchnia-plyta', levelId: P, x: 6.3, y: 9.55, rot: 0, w: 0.6, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-dolna-2', type: 'kuchnia-dolna', levelId: P, x: 6.95, y: 9.55, rot: 0, w: 0.7, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-zlew', type: 'kuchnia-zlew', levelId: P, x: 7.7, y: 9.55, rot: 0, w: 0.8, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-dolna-3', type: 'kuchnia-dolna', levelId: P, x: 8.275, y: 9.55, rot: 0, w: 0.35, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  // ============ 0/5 Kuchnia (3,75 × 2,80): dwa krótkie rzędy + WOLNOSTOJĄCA wyspa-barek na granicy z jadalnią
+  // rząd północny (blat 0,90 ≤ parapet 0,91): szafka, płyta, szafka, zlew pod oknem. Kończy się na x = 7,70,
+  // żeby obejście wyspy od północy miało 0,90 m; zaczyna na y = 9,25 – tuż za pasem drzwi przesuwnych spiżarni.
+  { id: 'mt-p5-dolna-1', type: 'kuchnia-dolna', levelId: P, x: 5.6, y: 9.55, rot: 0, w: 0.6, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-plyta', type: 'kuchnia-plyta', levelId: P, x: 6.2, y: 9.55, rot: 0, w: 0.6, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-dolna-2', type: 'kuchnia-dolna', levelId: P, x: 6.7, y: 9.55, rot: 0, w: 0.4, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-zlew', type: 'kuchnia-zlew', levelId: P, x: 7.3, y: 9.55, rot: 0, w: 0.8, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
   // szafki wiszące na lewo od okna (nad płytą – miejsce na okap w zabudowie)
   { id: 'mt-p5-gorna-polnoc', type: 'kuchnia-gorna', levelId: P, x: 5.95, y: 9.675, rot: 0, w: 1.3, d: 0.35, h: 0.75, color: KASZMIR, z: 1.45 },
-  // rząd południowy: lodówka w zabudowie, słupek z piekarnikiem, blat pomocniczy z szafkami wiszącymi
-  { id: 'mt-p5-lodowka', type: 'kuchnia-slupek', levelId: P, x: 5.6, y: 7.375, rot: 180, w: 0.6, d: 0.65, h: 2.2, color: KASZMIR },
-  { id: 'mt-p5-piekarnik', type: 'kuchnia-piekarnik', levelId: P, x: 6.2, y: 7.375, rot: 180, w: 0.6, d: 0.65, h: 2.2, color: KASZMIR },
-  { id: 'mt-p5-dolna-4', type: 'kuchnia-dolna', levelId: P, x: 7, y: 7.375, rot: 180, w: 1, d: 0.65, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-gorna-poludnie', type: 'kuchnia-gorna', levelId: P, x: 7, y: 7.225, rot: 180, w: 1, d: 0.35, h: 0.75, color: KASZMIR, z: 1.45 },
-  // wyspa-barek: fronty do kuchni (zachód), nawis barowy 30 cm po stronie jadalni; wychodzi 30 cm poza linię kuchni.
-  // Północnym końcem dosunięta do ściany okiennej, od południa wolne przejście 1,00 m.
-  { id: 'mt-p5-wyspa-barek', type: 'wyspa-barek', levelId: P, x: 8.9, y: 8.95, rot: 270, w: 1.8, d: 0.9, h: 0.92, color: KASZMIR, color2: DAB },
-  // hokery po stronie jadalni (wsunięte pod nawis)
-  { id: 'mt-p6-hoker-1', type: 'hoker', levelId: P, x: 9.4, y: 8.4, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
-  { id: 'mt-p6-hoker-2', type: 'hoker', levelId: P, x: 9.4, y: 8.95, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
-  { id: 'mt-p6-hoker-3', type: 'hoker', levelId: P, x: 9.4, y: 9.5, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
+  // rząd południowy: lodówka w zabudowie, słupek z piekarnikiem, blat pomocniczy z szafkami wiszącymi.
+  // Odsunięty 13 cm od ściany spiżarni: przy niej jeździ skrzydło drzwi przesuwnych (pas 12,5 cm, y 7,56..9,25).
+  { id: 'mt-p5-lodowka', type: 'kuchnia-slupek', levelId: P, x: 5.73, y: 7.375, rot: 180, w: 0.6, d: 0.65, h: 2.2, color: KASZMIR },
+  { id: 'mt-p5-piekarnik', type: 'kuchnia-piekarnik', levelId: P, x: 6.33, y: 7.375, rot: 180, w: 0.6, d: 0.65, h: 2.2, color: KASZMIR },
+  { id: 'mt-p5-dolna-4', type: 'kuchnia-dolna', levelId: P, x: 7.13, y: 7.375, rot: 180, w: 1, d: 0.65, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-gorna-poludnie', type: 'kuchnia-gorna', levelId: P, x: 7.13, y: 7.225, rot: 180, w: 1, d: 0.35, h: 0.75, color: KASZMIR, z: 1.45 },
+  // wyspa-barek 1,00 × 0,70 m, wolnostojąca: przejścia po 0,90 m od północy i od południa (otwarcie ma 2,80 m),
+  // fronty do kuchni (zachód), nawis barowy po stronie jadalni; wychodzi 25 cm poza linię kuchni.
+  { id: 'mt-p5-wyspa-barek', type: 'wyspa-mala', levelId: P, x: 8.95, y: 8.45, rot: 270, w: 1, d: 0.7, h: 0.92, color: KASZMIR, color2: DAB },
+  // dwa hokery po stronie jadalni (wsunięte 15 cm pod nawis)
+  { id: 'mt-p6-hoker-1', type: 'hoker', levelId: P, x: 9.36, y: 8.2, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
+  { id: 'mt-p6-hoker-2', type: 'hoker', levelId: P, x: 9.36, y: 8.7, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
 
   // ============ 0/6 Jadalnia (część salonu przy kuchni): stół na 6 osób równolegle do wyspy, 6 krzeseł
   { id: 'mt-p6-stol', type: 'stol-6', levelId: P, x: 11.5, y: 7.8, rot: 90, w: 1.8, d: 0.9, h: 0.76, color: DAB, color2: CZARNY },

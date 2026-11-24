@@ -13,7 +13,8 @@
       "profile": 0.04,
       "clearGap": 0.11,
       "color": "#1d1d1f",
-      "note": "Na parterze zamiast balustrady biegu dolnego czarne pionowe lamele 4 × 4 cm od stopnic do spodu stropu (+2,70), w linii dawnej balustrady (od strony korytarza). Po dwie lamele na stopień: rozstaw osi 13,5 cm, w świetle 9,5 cm. Nad częścią biegu pod otworem klatki lamele spina poziomy profil 4 × 4 cm na wysokości spodu stropu. Balustrady przy otworze klatki na poddaszu zostają. Założenie do uzgodnienia z projektantem / konstruktorem (mocowanie lameli, wymagania dla balustrad: prześwity i wysokość)."
+      "continuous": true,
+      "note": "Czarne pionowe lamele 4 × 4 cm zamiast wszystkich balustrad schodów, ciągłe przez obie kondygnacje. (1) W duszy między biegami (y = 5,83; x 6,30..8,46): po dwie lamele na stopień biegu dolnego (rozstaw osi 13,5 cm, w świetle 9,5 cm) – pod otworem klatki od stopnic do sufitu poddasza (+5,58), pod stropem przy wejściu (x 7,92..8,46) od stopnic do spodu stropu (+2,70); ta sama linia osłania bieg górny od strony otworu. (2) Na krawędziach otworu klatki na poddaszu, w osi dawnych balustrad, od posadzki (+3,03) do sufitu (+5,58): wzdłuż korytarza (y = 4,80; x 5,30..7,92; 18 lameli, w świetle 10,6 cm, ostatnia w narożniku przy wyjściu) i nad biegiem dolnym (x = 7,92; y 5,80..6,80; 7 lameli, w świetle 10,1 cm, pierwsza w narożniku duszy). Pozostałe dwie krawędzie otworu to ściany. Wolne zostają: wejście na bieg dolny (x = 8,46) i wyjście z biegu górnego na korytarz (x = 7,92; y 4,80..5,80). Żadnych poręczy ani profili poziomych. Założenie do uzgodnienia z projektantem / konstruktorem (mocowanie lameli do stopni, czoła stropu i sufitu; wymagania dla balustrad: prześwity ≤ 12 cm, wysokość; pochwyt przy schodach – lamele go nie zastępują)."
     },
     "treads": {
       "tread": "#b88a5c",
@@ -44,5 +45,64 @@
       }
     },
     "note": "Sypialnia 1/9, łazienka 1/10 i garderoba 1/11: bez sufitu płaskiego na 2,55 m. Okładzina skosu biegnie tą samą płaszczyzną co skos z projektu (h = 1,425 + 0,70 · u od lica ścianki kolankowej) aż do kalenicy (y = 5,05; najwyżej ok. 4,79 m nad posadzką), po obu stronach kalenicy. Ściany tych pomieszczeń, także działowe i wspólne z sąsiadami o suficie płaskim, sięgają do tej płaszczyzny. Na poziomie dawnego sufitu widoczne drewniane belki. Strych nad pozostałymi pomieszczeniami bez zmian. Założenie do uzgodnienia z projektantem / konstruktorem (ocieplenie i wentylacja połaci do kalenicy, wyłaz dachowy WD nad sypialnią, ściany działowe wyższe niż w projekcie, rola jętek i płatwi w więźbie)."
+  },
+
+  "doors": {
+    "sliding": [
+      {
+        "id": "DP1", "level": "poddasze", "side": "1/9", "slide": "+x", "travel": 0.95,
+        "note": "Drzwi sypialnia 1/9 – łazienka 1/10 (otwór 92 × 208 w ściance D-2, x 0,56..1,48). Skrzydło 102 cm wisi od strony sypialni i odsuwa się w prawo (+x), na wolny odcinek ściany między otworami DP1 i DP2 (2,00 m); w lewo jest tylko 31 cm do szczytu. Droga ograniczona do 95 cm, żeby oba skrzydła zmieściły się obok siebie – po odsunięciu światło przejścia 90 cm. Założenie do uzgodnienia z projektantem / konstruktorem."
+      },
+      {
+        "id": "DP2", "level": "poddasze", "side": "1/9", "slide": "-x", "travel": 0.95,
+        "note": "Drzwi sypialnia 1/9 – garderoba 1/11 (otwór 92 × 208 w ściance D-2, x 3,48..4,40). Skrzydło 102 cm wisi od strony sypialni i odsuwa się w lewo (−x); w prawo jest tylko 65 cm do ściany nośnej. Droga 95 cm, światło przejścia 90 cm. Odsunięte skrzydła DP1 i DP2 stykają się w x = 2,48. Założenie do uzgodnienia z projektantem / konstruktorem."
+      },
+      {
+        "id": "DW4", "level": "parter", "side": "0/5", "slide": "-y",
+        "note": "Drzwi kuchnia 0/5 – spiżarnia 0/4 (w projekcie drzwi rozwierne D60, otwór 72 × 208 w ścianie nośnej W1, y 8,43..9,15, otwierane do kuchni). Skrzydło 82 cm wisi od strony kuchni i odsuwa się w dół rzutu (−y), w stronę ściany schodów: tam jest 1,38 m pełnej ściany, a w drugą stronę tylko 70 cm do narożnika. Odsunięte skrzydło zakrywa lico ściany y 7,61..8,43 – w grubości tej ściany są kanały wentylacyjne kuchni K-B (y 7,83..8,19); kratki muszą wypaść powyżej szyny albo po stronie spiżarni. Założenie do uzgodnienia z projektantem / konstruktorem."
+      }
+    ],
+    "leaf": {
+      "overlap": 0.05,
+      "thickness": 0.04,
+      "wallGap": 0.035,
+      "open": 0.6,
+      "color": "#a9764a",
+      "railColor": "#1d1d1f",
+      "note": "Skrzydło z desek z ramą, poprzeczką i ukośnymi zastrzałami (ciepłe drewno), szersze od otworu o 10 cm i wyższe o 4 cm, grubości 4 cm, wisi 3,5 cm od lica ściany na czarnej szynie z wózkami. W modelu narysowane w 60% drogi odsunięcia. Zamiast ościeżnicy gładkie ościeża w kolorze ściany. Przy ścianie, po której jeździ skrzydło, musi zostać wolny pas: cały tor skrzydła + 5 cm z każdej strony, 12,5 cm od lica ściany. Założenie do uzgodnienia z projektantem / konstruktorem (nośność ścianki działowej 12 cm pod szynę, szczelność i akustyka drzwi do łazienki)."
+    },
+    "note": "Drzwi przesuwne drewniane typu „barn” zamiast rozwiernych. Otwory w murze bez zmian względem projektu. Założenie do uzgodnienia z projektantem / konstruktorem."
+  },
+
+  "extraRoofWindows": {
+    "width": 0.78,
+    "length": 1.18,
+    "windows": [
+      {
+        "id": "OPD1", "room": "1/4", "slope": "skos-N", "x": [11.37, 12.15],
+        "betweenRafters": [11.31, 12.21],
+        "rafterShift": { "pair": 16, "from": 11.39, "to": 11.31 },
+        "note": "Pokój 1/4 (x 9,53..13,35, środek 11,44), połać od ogrodu. Okno 78 × 118 w osi x = 11,76. W projekcie pokój ma okno do podłogi OE1 180 × 231 w szczycie. Nad tym pokojem krokwie stoją co 82 cm (74 cm w świetle) – okno 78 cm się nie mieści; przyjęto przesunięcie 16. pary krokwi (licząc od zachodu) o 8 cm na zachód, z x = 11,39 na 11,31 (pola 82 | 82 zmieniają się na 74 | 90). Bez zmiany więźby mieści się tylko okno 66 × 118. Założenie do uzgodnienia z projektantem / konstruktorem."
+      },
+      {
+        "id": "OPD2", "room": "1/5", "slope": "skos-S", "x": [11.37, 12.15],
+        "betweenRafters": [11.31, 12.21],
+        "rafterShift": { "pair": 16, "from": 11.39, "to": 11.31 },
+        "note": "Pokój 1/5 (przy ściance kolankowej x 10,15..13,35, środek 11,75), połać od frontu. Okno 78 × 118 w osi x = 11,76 – w tym samym polu między krokwiami co OPD1 (ta sama przesunięta 16. para krokwi). W projekcie pokój ma okno do podłogi OE2 180 × 231 w szczycie. Założenie do uzgodnienia z projektantem / konstruktorem."
+      },
+      {
+        "id": "OPD3", "room": "1/8", "slope": "skos-S", "x": [1.56, 2.34],
+        "betweenRafters": [1.50, 2.40],
+        "note": "Pokój 1/8 (x 0,25..5,05, środek 2,65), połać od frontu. Okno 78 × 118 w osi x = 1,95 – w najbliższym polu 90 cm między krokwiami (pary 4 i 5), bez zmian w więźbie; pola nad środkiem pokoju mają 70 cm. Leży naprzeciw okna OP1 w połaci od ogrodu. W projekcie pokój ma okno do podłogi OW2 150 × 231 w szczycie. Założenie do uzgodnienia z projektantem / konstruktorem."
+      }
+    ],
+    "rafters": {
+      "firstAxis": -0.96,
+      "spacing": [0.72, 0.90, 0.84, 0.90, 0.70, 0.70, 0.70, 0.90, 0.75, 0.90, 0.90, 0.90, 0.90, 0.82, 0.82, 0.82, 0.82, 0.82, 0.72],
+      "width": 0.08,
+      "src": "rys. 15 (rzut więźby): łańcuch rozstawu osi krokwi 72|90|84|90|70|70|70|90|75|90|90|90|90|82|82|82|82|82|72 = 1553 cm; skrajne osie x = −0,96 i 14,57; krokwie 8 × 16 cm, 20 par",
+      "note": "Rozstaw krokwi przepisany z rysunku więźby – w house.json go nie ma. Służy tylko do kontroli, że okna połaciowe mieszczą się między krokwiami (dokładność położenia ok. 1–2 cm). Założenie do uzgodnienia z projektantem / konstruktorem."
+    },
+    "note": "Po jednym dodatkowym oknie połaciowym 78 × 118 w pokojach dzieci 1/4, 1/5 i 1/8, na tej samej wysokości co okna z projektu (dół w połaci +4,98, góra +5,66; dolna krawędź nad licem ścianki kolankowej), ze szpaletem prostopadłym do połaci. Okna nie leżą nad ściankami działowymi, płatwiami (osie y = 2,40 i 7,70), kominami ani przy istniejących oknach. Założenie do uzgodnienia z projektantem / konstruktorem (wymiany lub przesunięcie krokwi, zmiana projektu – okna w połaci widocznej z drogi mogą wymagać zgłoszenia)."
   }
 }

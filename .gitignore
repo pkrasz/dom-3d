@@ -4,3 +4,4 @@ dist
 # odczyty i podkłady z projektu architekta (adres, dane biura, rysunki) – tylko lokalnie
 etap1_analiza/
 preview/
+tests/review-*

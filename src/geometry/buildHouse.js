@@ -18,15 +18,18 @@ import { emitSite } from './site.js';
 import { emitRoof } from './roof.js';
 import { emitStairs, emitBalustrades } from './stairs.js';
 import { emitBeams } from './beams.js';
-import { designStaticColors } from './design.js';
+import { designStaticColors, withDesign } from './design.js';
 import { emitReveals, emitJoinery } from './joinery.js';
 import { createSurfaceMaterial, createStaticMaterials } from '../render/materials.js';
 
 /**
  * @param {Object} house   zawartość house.json
- * @param {Object} [design] opcje bryły z design.json (lamele przy schodach, stopnie drewniane, sufit otwarty do kalenicy)
+ * @param {Object} [design] opcje bryły z design.json (lamele przy schodach, stopnie drewniane, sufit otwarty do kalenicy,
+ *                          drzwi przesuwne, dodatkowe okna połaciowe)
  */
-export function buildHouse(house, design = {}) {
+export function buildHouse(projectHouse, design = {}) {
+  // projekt + elementy dołożone opcjami bryły (okna połaciowe); bez nich to ten sam obiekt
+  const house = withDesign(projectHouse, design);
   const models = house.levels.map((_, i) => buildLevelModel(house, i, design));
   const info = shellInfo(house);
   const group = new Group();

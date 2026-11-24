@@ -464,7 +464,7 @@ describe('meble – katalog: typy wariantu „Montana”', () => {
     }
     for (const hex of Object.values(FIXED_COLORS)) expect(hex).toMatch(/^#[0-9a-f]{6}$/);
     // drewniane blaty kuchni i wyspy: blat to drugi kolor, domyślnie ciepły dąb
-    for (const id of ['kuchnia-dolna', 'kuchnia-zlew', 'kuchnia-plyta', 'kuchnia-wyspa', 'wyspa-barek']) {
+    for (const id of ['kuchnia-dolna', 'kuchnia-zlew', 'kuchnia-plyta', 'kuchnia-wyspa', 'wyspa-barek', 'wyspa-mala']) {
       const t = getType(id);
       expect(t.color2, id).toBe('#b5895a');
       const top = buildParts(t, t.size.w, t.size.d, t.size.h).filter((p) => p.mat === 'second' && p.max[0] - p.min[0] > t.size.w - 1e-9 && p.max[1] - p.min[1] > t.size.d - 1e-9);
@@ -514,13 +514,80 @@ describe('meble – katalog: typy wariantu „Montana”', () => {
       expect(t.mount, id).toBeGreaterThanOrEqual(MOUNT_RANGE[0]);
       expect(t.mount + t.size.h, id).toBeLessThanOrEqual(house.levels[0].ceilingHeight);
     }
-    expect(CATALOG.filter((t) => t.mount !== undefined).map((t) => t.id).sort()).toEqual(['kuchnia-gorna', 'lustro', 'lustro-okragle', 'monitor', 'polka-wiszaca', 'wieszak']);
+    expect(CATALOG.filter((t) => t.mount !== undefined).map((t) => t.id).sort()).toEqual(['kuchnia-gorna', 'lustro', 'lustro-okragle', 'monitor', 'polka-wiszaca', 'telewizor', 'wieszak']);
     for (const id of ['dywan', 'dywan-okragly', 'mata']) {
       const t = getType(id);
       expect(t.range.h[1], id).toBeLessThanOrEqual(0.05); // nie zasłania mebli stojących na nim
       expect(t.mount, id).toBeUndefined();
     }
     expect(getType('monitor').mount).toBe(getType('biurko').size.h); // staje na blacie zwykłego biurka
+  });
+
+  it('runda 2: toaletka, stołek, regał z ozdobami, telewizor, szafka RTV, podwójna umywalka, mała wyspa', () => {
+    const ROUND2 = {
+      toaletka: [1.1, 0.45, 1.45], stolek: [0.42, 0.42, 0.46], 'regal-dekoracyjny': [1.2, 0.3, 1.8], telewizor: [1.25, 0.06, 0.72],
+      'szafka-rtv-loft': [1.6, 0.4, 0.5], 'umywalka-podwojna': [1.4, 0.5, 0.95], 'wyspa-mala': [1.2, 0.7, 0.92],
+    };
+    for (const [id, [w, d, h]] of Object.entries(ROUND2)) expect(getType(id)?.size, id).toEqual({ w, d, h });
+    const at = (id, w, d, h) => buildParts(getType(id), w, d, h);
+    const dflt = (id) => { const t = getType(id); return at(id, t.size.w, t.size.d, t.size.h); };
+
+    // toaletka: blat na 76 cm na cały rzut, lustro przy TYLE (+y), pod blatem wolne miejsce na kolana
+    const toal = dflt('toaletka');
+    expect(toal.filter((p) => p.mat === 'main' && p.max[2] === 0.76 && p.max[0] - p.min[0] > 1.1 - 1e-9)).toHaveLength(1);
+    const mirror = toal.filter((p) => p.mat === 'mirror');
+    expect(mirror).toHaveLength(1);
+    expect(mirror[0].min[1]).toBeGreaterThan(0.45 / 2 - 0.05);
+    expect(mirror[0].min[2]).toBeGreaterThan(0.76);
+    expect(Math.min(...toal.filter((p) => p.mat !== 'second').map((p) => p.min[2]))).toBeGreaterThan(0.55);
+    expect(getType('stolek').size.h).toBeLessThan(0.55); // wsuwa się pod szuflady toaletki
+
+    // regał dekoracyjny: płytki (do 40 cm), otwarty, z ozdobami stojącymi NA półkach i poniżej wierzchu
+    const reg = getType('regal-dekoracyjny');
+    expect(reg.range.d[1]).toBeLessThanOrEqual(0.4);
+    for (const [w, d, h] of [[1.2, 0.3, 1.8], [0.6, 0.2, 0.9], [2.4, 0.4, 2.4], [0.6, 0.4, 1.3]]) {
+      const parts = at('regal-dekoracyjny', w, d, h);
+      const shelves = parts.filter((p) => p.mat === 'main');
+      expect(shelves.length).toBeGreaterThanOrEqual(3);
+      const decor = parts.filter((p) => p.mat !== 'main' && p.mat !== 'second');
+      expect(decor.length).toBeGreaterThanOrEqual(7);
+      for (const p of decor) {
+        expect(p.max[2], `${w}×${h}: ozdoba pod wierzchem`).toBeLessThan(h - 0.03);
+        expect(p.min[0]).toBeGreaterThan(-w / 2 + 0.025); // między słupkami stelaża
+        expect(p.max[0]).toBeLessThan(w / 2 - 0.025);
+        const above = shelves.filter((s) => s.min[2] > p.min[2]).map((s) => s.min[2]);
+        expect(p.max[2], `${w}×${h}: ozdoba nie przebija półki wyżej`).toBeLessThan(Math.min(...above));
+      }
+    }
+
+    // telewizor: wiszący, płaski, ekran od FRONTU (−y)
+    const tv = getType('telewizor');
+    expect(tv.mount).toBe(1.0);
+    expect(tv.range.d[1]).toBeLessThanOrEqual(0.1);
+    const screen = dflt('telewizor').filter((p) => p.mat === 'screen');
+    expect(screen).toHaveLength(1);
+    expect(screen[0].min[1]).toBeCloseTo(-tv.size.d / 2, 9);
+
+    // podwójna umywalka: dwie misy (drugi kolor – domyślnie terakota) w całym zakresie szerokości, każda w swojej połowie blatu
+    const um = getType('umywalka-podwojna');
+    expect(um.color2).toBe('#c2704f');
+    for (const w of [um.range.w[0], um.size.w, um.range.w[1]]) {
+      const bowls = at('umywalka-podwojna', w, um.range.d[0], 0.95).filter((p) => p.shape === 'tube' && p.mat === 'second');
+      expect(bowls, `szer. ${w}`).toHaveLength(2);
+      expect(bowls[0].max[0]).toBeLessThanOrEqual(0);
+      expect(bowls[1].min[0]).toBeGreaterThanOrEqual(0);
+    }
+    // zwykła szafka z umywalką nablatową zachowuje się jak dotąd: jedna misa, od 1,30 m dwie
+    expect(at('umywalka-nablatowa', 0.8, 0.48, 0.95).filter((p) => p.shape === 'tube')).toHaveLength(1);
+    expect(at('umywalka-nablatowa', 1.3, 0.48, 0.95).filter((p) => p.shape === 'tube')).toHaveLength(2);
+
+    // mała wyspa: mniejsze minimum niż wyspa-barek, nawis na hokery od TYŁU (+y)
+    const small = getType('wyspa-mala');
+    const big = getType('wyspa-barek');
+    expect(small.range.w[0]).toBeLessThan(big.range.w[0]);
+    expect(small.range.d[0]).toBeLessThan(big.range.d[0]);
+    const cab = dflt('wyspa-mala').filter((p) => p.mat === 'dark');
+    expect(Math.max(...cab.map((p) => p.max[1]))).toBeLessThan(small.size.d / 2 - 0.15);
   });
 
   it('dywan pod meblami nie przeszkadza w ustawianiu: meble kolidują tylko ze ścianami', () => {

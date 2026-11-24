@@ -39,8 +39,12 @@
  *           które zmieniają bryłę względem projektu (house.json zostaje wierny projektowi). Pusty obiekt = dokładnie projekt.
  *           Każda opcja ma pole `note` (założenie do uzgodnienia z projektantem / konstruktorem). Dziś:
  *             design.stairs.groundFloorBalustrade = 'slats' – zamiast balustrady biegu dolnego czarne pionowe lamele
- *               od stopnic do spodu stropu (design.stairs.slats: profile, clearGap, color); siatka stała 'parter:stairs:slat';
- *               balustrady przy otworze klatki na poddaszu zostają, kolizje w rzucie bez zmian;
+ *               od stopnic do spodu stropu (design.stairs.slats: profile, clearGap, color); siatka stała 'parter:stairs:slat'.
+ *               Z design.stairs.slats.continuous = true lamele są CIĄGŁE przez obie kondygnacje: w duszy między biegami
+ *               od stopnic biegu dolnego do sufitu poddasza, a na krawędziach otworu klatki na poddaszu od posadzki do sufitu
+ *               – zamiast wszystkich balustrad ('poddasze:stairs:balustrade' znika, dochodzi 'poddasze:stairs:slat';
+ *               część lameli do posadzki poddasza należy do parteru). Wejście na schody i wyjście na korytarz poddasza
+ *               zostają wolne. Kolizje w rzucie jak w projekcie, tylko osłona między biegami leży w linii lameli (y = 5,83);
  *             design.stairs.treads = { tread, riser } – stopnice drewniane i jasne podstopnice (siatki stałe
  *               'parter:stairs:stairTread' / 'stairTreadAlt' / 'stairRiser' zamiast 'stairs' / 'stairsAlt');
  *             design.openCeiling.rooms = ['1/9', …] – w tych pomieszczeniach poddasza nie ma sufitu płaskiego:
@@ -49,6 +53,19 @@
  *               (design.openCeiling.beams: jętki i płatwie, siatka 'poddasze:ceiling:beam').
  *               W domku dla lalek i w rzucie część ścian ponad dawnym sufitem (2,55 m) i belki znikają razem z sufitami
  *               (mesh.userData.headerStart – ten sam mechanizm co pasy podciągów).
+ *             design.doors.sliding = [{ id, level, side, slide, travel? }] – te drzwi wewnętrzne są PRZESUWNE („barn”):
+ *               bez ościeżnicy i skrzydła rozwiernego, z gładkimi ościeżami; drewniane skrzydło (siatka '<kondygnacja>:joinery:barnDoor')
+ *               wisi na czarnej szynie ('…:joinery:barnRail') po stronie pomieszczenia `side` i odsuwa się w kierunku `slide`
+ *               ('+x' | '-x' | '+y' | '-y'); narysowane częściowo odsunięte (design.doors.leaf.open). Przejście w spacerze jak dotąd.
+ *               Dziś: DP1 i DP2 (sypialnia 1/9 → łazienka 1/10 i garderoba 1/11, skrzydła po stronie sypialni) oraz
+ *               DW4 (kuchnia 0/5 → spiżarnia 0/4, skrzydło po stronie kuchni). MEBLE: przy ścianie musi zostać wolny tor
+ *               skrzydła – prostokąty podaje app.collision.slidingDoors(levelId)[i].keepClear (tor + 5 cm; 12,5 cm od ściany).
+ *             design.extraRoofWindows.windows = [{ id, room, slope, x }] – dodatkowe okna połaciowe (dziś 78 × 118 w pokojach
+ *               1/4, 1/5, 1/8), budowane dokładnie jak roofWindows z house.json: otwór w połaci i w okładzinie skosu, rama,
+ *               szyba, szpalet. Identyfikatory powierzchni bez zmian – maleje tylko pole skosu ('poddasze:1/4:slope-N',
+ *               'poddasze:1/5:slope-S', 'poddasze:1/8:slope-S'). app.house.levels[…].roofWindows dalej zawiera TYLKO okna
+ *               z projektu; komplet z dodatkowymi daje extraRoofWindows(house, design) / withDesign() z geometry/design.js.
+ *               design.extraRoofWindows.rafters – rozstaw krokwi przepisany z rysunku więźby (tylko do kontroli położenia okien).
  *           Lista powierzchni (app.surfaces) zależy więc od design – wykończenia zapisuj tylko dla istniejących surfaceId.
  * @property {{getState: () => import('./store.js').AppState, setState: Function, subscribe: Function}} store
  *           pola stanu: levelId ('parter' | 'poddasze' | 'all'), viewMode ('top' | 'orbit' | 'walk'), showRoof, lighting, selection, activeTool, variant
@@ -117,8 +134,13 @@
  * @property {{walls: (levelId: string) => Array<{rect: number[], kind: string, id: string}>,
  *             pointInRoom: (levelId: string, x: number, y: number) => ?string,
  *             roomPolygon: (levelId: string, roomId: string) => ?number[][],
- *             ceilingAt: (levelId: string, x: number, y: number) => ?number}} collision
+ *             ceilingAt: (levelId: string, x: number, y: number) => ?number,
+ *             slidingDoors: (levelId: string) => Array<{id: string, roomId: string, keepClear: number[], leafRect: number[], trackRect: number[], clearWidth: number}>}} collision
  *           walls: prostokąty [x0, y0, x1, y1] blokujące ruch (mury bez świateł drzwi, kominy, balustrady / lamele)
+ *           slidingDoors: drzwi przesuwne kondygnacji z design.doors.sliding (pusta lista bez tej opcji); keepClear = prostokąt
+ *             [x0, y0, x1, y1] w pomieszczeniu roomId, który musi zostać wolny od mebli (cały tor skrzydła + 5 cm),
+ *             leafRect = rzut narysowanego skrzydła, trackRect = rzut toru, clearWidth = światło przejścia po odsunięciu.
+ *             Skrzydło NIE jest w walls() – meble same muszą omijać keepClear.
  *           ceilingAt: wysokość pomieszczenia nad posadzką w punkcie (sufit płaski, skos albo – w pomieszczeniu
  *             z design.openCeiling – okładzina skosu do kalenicy); przydatne do sprawdzania, czy mebel mieści się pod skosem
  * @property {{get: () => import('./variant.js').Variant, update: (mutator: (draft: Object) => void) => void, set: (v: Object) => void}} variant
@@ -370,7 +392,10 @@ export function createApp({ house, design = {}, container, canvas, uiRoot }) {
     },
     ui: { openPanel: ui.openPanel, closePanel: ui.closePanel, addToolbarButton: ui.addToolbarButton, toast: ui.toast },
     picking: { setDragHandler: picking.setDragHandler, hitTest: picking.hitTest, floorPoint: picking.floorPoint },
-    collision: { walls: collision.walls, pointInRoom: collision.pointInRoom, roomPolygon: collision.roomPolygon, ceilingAt: collision.ceilingAt },
+    collision: {
+      walls: collision.walls, pointInRoom: collision.pointInRoom, roomPolygon: collision.roomPolygon,
+      ceilingAt: collision.ceilingAt, slidingDoors: collision.slidingDoors,
+    },
     variant: {
       get: () => store.getState().variant,
       update(mutator) {

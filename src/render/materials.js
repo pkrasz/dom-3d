@@ -38,6 +38,8 @@ export const STATIC_COLORS = {
   stairTreadAlt: DESIGN_COLORS.stairTread, // co druga stopnica – ton ciemniejsza (liczona z koloru stopnicy)
   stairRiser: DESIGN_COLORS.stairRiser, // podstopnice i boki schodów
   beam: DESIGN_COLORS.beam, // belki pod otwartym sufitem
+  barnDoor: DESIGN_COLORS.barnDoor, // skrzydła drzwi przesuwnych
+  barnRail: DESIGN_COLORS.barnRail, // szyna i wózki drzwi przesuwnych
   terrain: '#9aa88f',
   paving: '#b9b7b0',
   chimney: '#d9d6cf',

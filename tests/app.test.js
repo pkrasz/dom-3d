@@ -81,7 +81,8 @@ describe('rdzeń – składanie i API', () => {
       expect(app[key], key).toBeTruthy();
     }
     for (const key of ['openPanel', 'closePanel', 'addToolbarButton', 'toast']) expect(typeof app.ui[key], key).toBe('function');
-    for (const key of ['walls', 'pointInRoom', 'roomPolygon']) expect(typeof app.collision[key], key).toBe('function');
+    for (const key of ['walls', 'pointInRoom', 'roomPolygon', 'ceilingAt', 'slidingDoors']) expect(typeof app.collision[key], key).toBe('function');
+    expect(app.collision.slidingDoors('parter')).toEqual([]); // bez design.json nie ma drzwi przesuwnych
     expect(typeof app.picking.setDragHandler).toBe('function');
     expect(app.three.Mesh).toBeTruthy();
     expect(app.surfaces.size).toBeGreaterThan(100);
@@ -475,6 +476,18 @@ describe('rdzeń – opcje bryły z design.json', () => {
     expect(app.collision.ceilingAt('poddasze', 2.0, 5.05)).toBeCloseTo(2.55, 9);
     expect(meshes().some((m) => m.name === 'parter:stairs:slat')).toBe(true);
     expect(meshes().some((m) => m.name === 'parter:stairs:balustrade')).toBe(false);
+    // lamele ciągłe: także na poddaszu, zamiast balustrad otworu klatki
+    expect(meshes().some((m) => m.name === 'poddasze:stairs:slat')).toBe(true);
+    expect(meshes().some((m) => m.name === 'poddasze:stairs:balustrade')).toBe(false);
+    // drzwi przesuwne: skrzydła i szyny w bryle, strefy wolne od mebli w API kolizji
+    for (const name of ['parter:joinery:barnDoor', 'parter:joinery:barnRail', 'poddasze:joinery:barnDoor', 'poddasze:joinery:barnRail']) expect(meshes().some((m) => m.name === name), name).toBe(true);
+    expect(app2.collision.slidingDoors('poddasze').map((x) => [x.id, x.roomId, x.keepClear])).toEqual([
+      ['DP1', '1/9', [0.46, 6.995, 2.53, 7.12]],
+      ['DP2', '1/9', [2.43, 6.995, 4.5, 7.12]],
+    ]);
+    expect(app2.collision.slidingDoors('parter').map((x) => [x.id, x.roomId])).toEqual([['DW4', '0/5']]);
+    // dodatkowe okna połaciowe: skosy pokoi dzieci mają mniejsze pole niż w projekcie
+    for (const id of ['poddasze:1/4:slope-N', 'poddasze:1/5:slope-S', 'poddasze:1/8:slope-S']) expect(app2.getSurface(id).areaM2, id).toBeLessThan(app.getSurface(id).areaM2 - 0.5);
   });
 
   it('domek dla lalek: belki, skosy i część ścian ponad dawnym sufitem znikają razem z sufitami', () => {
@@ -495,6 +508,9 @@ describe('rdzeń – opcje bryły z design.json', () => {
     app2.store.setState({ levelId: 'parter' });
     expect(meshes().find((m) => m.name === 'parter:stairs:slat').visible).toBe(true);
     expect(beam().visible).toBe(false);
+    // część lameli ponad posadzką poddasza i drzwi przesuwne sypialni znikają razem z poddaszem
+    for (const name of ['poddasze:stairs:slat', 'poddasze:joinery:barnDoor', 'poddasze:joinery:barnRail']) expect(meshes().find((m) => m.name === name).visible, name).toBe(false);
+    for (const name of ['parter:joinery:barnDoor', 'parter:joinery:barnRail']) expect(meshes().find((m) => m.name === name).visible, name).toBe(true);
   });
 
   it('dach włączony i spacer: pełne ściany do skosu, belki widoczne', () => {
@@ -529,7 +545,7 @@ describe('rdzeń – opcje bryły z design.json', () => {
     expect(wall.geometry.drawRange.count).toBe(wall.userData.headerStart);
     expect(app2.getSurface('poddasze:1/9:floor').mesh.visible).toBe(true);
     // nowe materiały stałe też są podpięte pod przekrój
-    for (const name of ['parter:stairs:slat', 'parter:stairs:stairTread', 'parter:stairs:stairRiser', 'poddasze:ceiling:beam']) {
+    for (const name of ['parter:stairs:slat', 'poddasze:stairs:slat', 'parter:stairs:stairTread', 'parter:stairs:stairRiser', 'poddasze:ceiling:beam', 'poddasze:joinery:barnDoor', 'poddasze:joinery:barnRail']) {
       expect(meshes().find((m) => m.name === name).material.clippingPlanes, name).toBe(app2.clippingPlanes);
     }
     app2.store.setState({ viewMode: 'orbit', levelId: 'parter', showRoof: false });

@@ -1,7 +1,9 @@
 // Schody S1 wg levels[0].stairs: biegi proste, stopnie zabiegowe, płyta pod spodem (uproszczona), balustrady.
 // stairModel() daje też funkcje wysokości stopnia i spodu płyty – używa ich tryb spaceru.
-// Opcje bryły (design.json): stopnice drewniane z jasnymi podstopnicami oraz lamele zamiast balustrady biegu dolnego.
-import { pointInPolygon, pointInRect, EPS } from './plan.js';
+// Opcje bryły (design.json): stopnice drewniane z jasnymi podstopnicami oraz lamele zamiast balustrad
+// (tylko bieg dolny albo – slats.continuous – ciągłe przez obie kondygnacje, także wokół otworu klatki).
+import { pointInPolygon, pointInRect, distanceToRect, EPS } from './plan.js';
+import { ceilingAtPoint } from './levelModel.js';
 import { BALUSTRADE_POST, BALUSTRADE_RAIL, BALUSTRADE_POST_SPACING, BALUSTRADE_SIDE_OFFSET } from './constants.js';
 import { slatOptions, treadOptions } from './design.js';
 
@@ -189,27 +191,62 @@ export function balustradeSegments(house) {
   return out;
 }
 
-/** Czy ten odcinek balustrady zastępują lamele (opcja bryły: bieg na najniższej kondygnacji). */
-const replacedBySlats = (house, seg, design) =>
-  !!slatOptions(design) && seg.levelId === house.levels[0].id && seg.type === 'raked' && seg.partIndex !== null;
+/**
+ * Czy ten odcinek balustrady zastępują lamele (opcja bryły): bieg na najniższej kondygnacji,
+ * a przy lamelach ciągłych (slats.continuous) także wszystkie balustrady otworu klatki na wyższej kondygnacji.
+ */
+const replacedBySlats = (house, seg, design) => {
+  const opt = slatOptions(design);
+  if (!opt) return false;
+  if (seg.levelId === house.levels[0].id) return seg.type === 'raked' && seg.partIndex !== null;
+  return opt.continuous;
+};
 
 /**
- * Lamele zamiast balustrady biegu (design.stairs.groundFloorBalustrade = 'slats'): pionowe profile od stopnic
- * do spodu stropu, w linii dawnej balustrady. Nad biegiem, gdzie stropu nie ma (otwór klatki), lamele spina
+ * Położenia środków lameli na odcinku o długości `length`: profil `p`, odstęp w świetle najwyżej `gap`.
+ * Koniec „ze słupkiem” (post) zaczyna się lamelą, koniec przy ścianie – odstępem.
+ */
+export function distributeSlats(length, p, gap, postStart, postEnd) {
+  for (let n = 1; n < 1000; n++) {
+    const gaps = n - 1 + (postStart ? 0 : 1) + (postEnd ? 0 : 1);
+    const g = gaps ? (length - n * p) / gaps : 0;
+    if (gaps && g > gap + 1e-9) continue;
+    if (!gaps && n * p < length - 1e-9) continue;
+    const first = (postStart ? 0 : g) + p / 2;
+    return Array.from({ length: n }, (_, i) => first + i * (p + g));
+  }
+  return [];
+}
+
+/**
+ * Lamele zamiast balustrad (design.stairs.groundFloorBalustrade = 'slats'): pionowe profile w linii dawnej balustrady.
+ *
+ * Tylko bieg dolny (domyślnie): od stopnic do spodu stropu; nad częścią biegu pod otworem klatki lamele spina
  * poziomy profil na wysokości spodu stropu.
- * Zwraca { slats: [{ x, y, z0, z1, underSlab }], rails: [{ from, to, z }], profile } – same dane (testy, podgląd).
+ *
+ * Ciągłe przez obie kondygnacje (slats.continuous = true):
+ *   linia 'flight' – w duszy między biegami: od stopnic biegu dolnego do SUFITU wyższej kondygnacji (pod otworem klatki),
+ *                    a pod stropem jak wyżej – do spodu stropu; ta sama linia osłania bieg górny od strony otworu;
+ *   linie 'void'   – na krawędziach otworu klatki (dawne balustrady poziome): od posadzki wyższej kondygnacji do jej sufitu.
+ *                    Koniec przy ścianie zaczyna się odstępem, koniec wolny – lamelą narożną.
+ *   Wyjście z biegu górnego (stairVoid.arrival) i wejście na bieg dolny zostają wolne; profilu poziomego nie ma.
+ *
+ * Zwraca { slats: [{ x, y, z0, z1, underSlab, line }], rails: [{ from, to, z }], profile } – same dane (testy, podgląd).
  */
 export function slatLayout(house, design = {}) {
   const opt = slatOptions(design);
   const out = { slats: [], rails: [], profile: opt?.profile ?? 0 };
   const model = opt ? stairModel(house) : null;
   if (!model) return out;
-  const level = house.levels[0];
+  const [level, upper] = house.levels;
   const top = level.floorLevel + level.ceilingHeight; // spód stropu
   const voidRect = level.slabAbove?.openings?.find((o) => o.kind === 'stairs')?.rect || null;
+  const continuous = opt.continuous && !!upper;
+  const upperTop = (x, y) => upper.floorLevel + ceilingAtPoint(upper, design, x, y); // sufit wyższej kondygnacji
   const p = opt.profile;
-  for (const seg of balustradeSegments(house)) {
-    if (!replacedBySlats(house, seg, design)) continue;
+  const segments = balustradeSegments(house);
+  for (const seg of segments) {
+    if (seg.levelId !== level.id || !replacedBySlats(house, seg, design)) continue;
     const y = seg.from[1]; // biegi w projekcie idą wzdłuż x (jak w stairModel)
     const open = []; // położenia lameli pod otworem klatki
     for (const s of model.steps.filter((st) => st.partIndex === seg.partIndex && st.kind === 'flight')) {
@@ -218,10 +255,11 @@ export function slatLayout(house, design = {}) {
         const x = s.a + ((s.b - s.a) * (i + 0.5)) / n;
         const underSlab = !(voidRect && pointInRect(x, y, voidRect));
         if (!underSlab) open.push(x);
-        out.slats.push({ x, y, z0: s.top, z1: underSlab ? top : top - p, underSlab });
+        const z1 = underSlab ? top : continuous ? upperTop(x, y) : top - p;
+        out.slats.push({ x, y, z0: s.top, z1, underSlab, line: 'flight' });
       }
     }
-    if (open.length) {
+    if (open.length && !continuous) {
       // profil górny: od skrajnej lameli do krawędzi stropu (albo do drugiej skrajnej lameli)
       let x0 = Math.min(...open) - p / 2;
       let x1 = Math.max(...open) + p / 2;
@@ -230,7 +268,42 @@ export function slatLayout(house, design = {}) {
       out.rails.push({ from: [x0, y], to: [x1, y], z: top - p / 2 });
     }
   }
+  if (!continuous) return out;
+
+  // krawędzie otworu klatki na wyższej kondygnacji: lamele od posadzki do sufitu, w osi dawnej balustrady
+  const atWall = ([x, y]) => upper.walls.some((w) => distanceToRect(x, y, w.rect) < 1e-3);
+  for (const seg of segments) {
+    if (seg.levelId !== upper.id || seg.type !== 'level') continue;
+    const length = Math.hypot(seg.to[0] - seg.from[0], seg.to[1] - seg.from[1]);
+    const ux = (seg.to[0] - seg.from[0]) / length;
+    const uy = (seg.to[1] - seg.from[1]) / length;
+    for (const t of distributeSlats(length, p, opt.gap, !atWall(seg.from), !atWall(seg.to))) {
+      const x = seg.from[0] + ux * t;
+      const y = seg.from[1] + uy * t;
+      out.slats.push({ x, y, z0: seg.zFrom, z1: upperTop(x, y), underSlab: false, line: 'void' });
+    }
+  }
   return out;
+}
+
+/**
+ * Odcinki blokujące ruch przy schodach (balustrady albo lamele, które je zastępują) – dla kolizji.
+ * Rzut jest taki sam jak w projekcie, z jednym wyjątkiem: przy lamelach ciągłych osłona między biegami na wyższej
+ * kondygnacji leży w linii lameli biegu dolnego (a nie po stronie biegu górnego, jak dawna balustrada).
+ */
+export function guardSegments(house, design = {}) {
+  const segments = balustradeSegments(house);
+  const opt = slatOptions(design);
+  if (!opt?.continuous || house.levels.length < 2) return segments;
+  const lower = segments.find((s) => s.levelId === house.levels[0].id && replacedBySlats(house, s, design));
+  if (!lower) return segments;
+  return segments.map((s) => {
+    if (s.levelId === house.levels[0].id || s.type !== 'raked' || s.partIndex === null) return s;
+    const horizontal = Math.abs(s.from[1] - s.to[1]) < EPS;
+    return horizontal
+      ? { ...s, from: [s.from[0], lower.from[1]], to: [s.to[0], lower.from[1]] }
+      : { ...s, from: [lower.from[0], s.from[1]], to: [lower.from[0], s.to[1]] };
+  });
 }
 
 export function emitBalustrades(house, batch, design = {}) {
@@ -240,8 +313,19 @@ export function emitBalustrades(house, batch, design = {}) {
   }
   const { slats, rails, profile } = slatLayout(house, design);
   if (!slats.length) return;
-  const b = batch('slat', 'stairs', house.levels[0].id, { noPick: true }); // dotknięcie przechodzi do ściany za lamelami
+  const [lower, upper] = house.levels;
+  // dotknięcie przechodzi do ściany za lamelami; część ponad posadzką wyższej kondygnacji należy do niej (znika razem z nią)
+  const b = batch('slat', 'stairs', lower.id, { noPick: true });
+  const bUp = upper ? batch('slat', 'stairs', upper.id, { noPick: true }) : b;
+  const cut = upper ? upper.floorLevel : Infinity;
   const h = profile / 2;
-  for (const s of slats) b.box(s.x - h, s.y - h, s.z0, s.x + h, s.y + h, s.z1, ['bottom', 'top']);
+  for (const s of slats) {
+    if (s.z0 < cut - EPS && s.z1 > cut + EPS) {
+      b.box(s.x - h, s.y - h, s.z0, s.x + h, s.y + h, cut, ['bottom']);
+      bUp.box(s.x - h, s.y - h, cut, s.x + h, s.y + h, s.z1, ['bottom', 'top']);
+    } else {
+      (s.z0 >= cut - EPS ? bUp : b).box(s.x - h, s.y - h, s.z0, s.x + h, s.y + h, s.z1, ['bottom', 'top']);
+    }
+  }
   for (const r of rails) b.bar([...r.from, r.z], [...r.to, r.z], profile, profile);
 }

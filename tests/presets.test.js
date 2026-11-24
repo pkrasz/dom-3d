@@ -107,23 +107,26 @@ describe('Montana – złożenie parteru i poddasza', () => {
     }
   });
 
-  it('zachowuje wszystkie meble z projektu (te same id, typy, położenia i wymiary)', () => {
+  it('zachowuje meble z projektu (te same id, typy, położenia i wymiary) – poza szafą w sypialni 1/9, usuniętą na życzenie', () => {
     const byId = new Map(v.furniture.map((f) => [f.id, f]));
     const geometry = ({ type, levelId, x, y, rot, w, d, h }) => ({ type, levelId, x, y, rot, w, d, h });
-    for (const s of createStarterFurniture()) {
+    const REMOVED = ['start-szafa-1-9']; // w jej miejscu toaletka (życzenie właściciela)
+    for (const id of REMOVED) expect(byId.has(id), id).toBe(false);
+    expect(v.furniture.filter((f) => f.id.startsWith('start-'))).toHaveLength(createStarterFurniture().length - REMOVED.length);
+    for (const s of createStarterFurniture().filter((f) => !REMOVED.includes(f.id))) {
       expect(byId.has(s.id), s.id).toBe(true);
       expect(geometry(byId.get(s.id)), s.id).toEqual(geometry(s));
     }
   });
 
   it('życzenia do kuchni z jadalnią: wyspa-barek z hokerami, drewniane blaty, stół na 6 osób z 6 krzesłami', () => {
-    const island = v.furniture.filter((f) => f.type === 'wyspa-barek');
+    const island = v.furniture.filter((f) => f.type === 'wyspa-barek' || f.type === 'wyspa-mala');
     expect(island).toHaveLength(1);
     expect(v.furniture.filter((f) => f.type === 'hoker').length).toBeGreaterThanOrEqual(2);
     expect(v.furniture.filter((f) => f.type === 'stol-6')).toHaveLength(1);
     expect(v.furniture.filter((f) => f.type === 'krzeslo' && f.levelId === 'parter')).toHaveLength(6);
     // blat = drugi kolor szafek kuchennych; brak pola oznacza domyślny dąb typu
-    const kitchen = v.furniture.filter((f) => /^kuchnia-(dolna|zlew|plyta|wyspa)$/.test(f.type) || f.type === 'wyspa-barek');
+    const kitchen = v.furniture.filter((f) => /^kuchnia-(dolna|zlew|plyta|wyspa)$/.test(f.type) || /^wyspa-(barek|mala)$/.test(f.type));
     expect(kitchen.length).toBeGreaterThan(3);
     for (const f of kitchen) expect(f.color2 ?? typeById.get(f.type).color2, f.id).toBe('#b5895a');
     // jedna podłoga w salonie z jadalnią, kuchni, korytarzu i spiżarni

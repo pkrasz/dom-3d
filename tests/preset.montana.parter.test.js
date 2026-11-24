@@ -36,7 +36,7 @@ const homeRoom = (f) => STARTER_ROOM[f.id] || `0/${/^mt-p(\d)-/.exec(f.id)[1]}`;
 /** Świadome wyjątki od „w całości w swoim pomieszczeniu”. */
 const ROOM_EXCEPTIONS = {
   'mt-p1-scianka-szklana': ['0/1', '0/2'], // stoi w świetle przejścia P1, na granicy obu pomieszczeń
-  'mt-p5-wyspa-barek': ['0/5', '0/6'], // życzenie właściciela: wyspa wychodzi w stronę jadalni
+  'mt-p5-wyspa-barek': ['0/5', '0/6'], // życzenie właściciela: wyspa może delikatnie wychodzić w stronę jadalni
 };
 
 /** Punkt w rzucie mebla (z tolerancją). */
@@ -144,16 +144,30 @@ function insideSide(o) {
 const intersecting = (rect, filter = () => true) => furniture.filter((f) => filter(f) && penetration(f, rect)).map((f) => f.id);
 const standing = (f) => !isFlat(f);
 
-/** Skrzydła ścianki szklanej: 2 × min(0,90; …) jak w katalogu; ZAŁOŻENIE projektu – otwierają się do wiatrołapu (−y). */
+/**
+ * Skrzydła ścianki szklanej: 2 × min(0,90; …) jak w katalogu. ZAŁOŻENIE wariantu – otwierają się do korytarza (+y),
+ * żeby ceglana ściana wiatrołapu zmieściła siedzisko i konsolę (życzenie: konsola w wiatrołapie).
+ */
 function glassLeaves(f) {
   const leaf = Math.min(0.9, (f.w - 0.09) / 2);
   const xa = (f.w - 2 * leaf) / 2;
-  const y = f.y - f.d / 2;
+  const y = f.y + f.d / 2;
   return [
-    { id: 'ścianka-L', hinge: [f.x - f.w / 2 + xa, y], closed: [1, 0], open: [0, -1], r: leaf },
-    { id: 'ścianka-P', hinge: [f.x + f.w / 2 - xa, y], closed: [-1, 0], open: [0, -1], r: leaf },
+    { id: 'ścianka-L', hinge: [f.x - f.w / 2 + xa, y], closed: [1, 0], open: [0, 1], r: leaf },
+    { id: 'ścianka-P', hinge: [f.x + f.w / 2 - xa, y], closed: [-1, 0], open: [0, 1], r: leaf },
   ];
 }
+
+/** Drzwi przesuwne z design.json: skrzydło jeździ po ścianie (bez łuku), przy ścianie musi zostać wolny pas keepClear. */
+const sliding = collision.slidingDoors(LEVEL);
+const slidingIds = new Set(sliding.map((d) => d.id));
+
+/** Prostokąt głębokości depth przyległy do FRONTU mebla (−y lokalnie), na całą jego szerokość. */
+function frontZone(f, depth) {
+  const ly = -(f.d + depth) / 2;
+  return aabb({ x: f.x - ly * Math.sin(f.rot * RAD), y: f.y + ly * Math.cos(f.rot * RAD), rot: f.rot, w: f.w, d: depth });
+}
+const shrink = (r, m = 0.005) => [r[0] + m, r[1] + m, r[2] - m, r[3] - m];
 
 /** Największy wolny odcinek [lo, hi] po odjęciu przedziałów zajętych. */
 function widestGap(lo, hi, taken) {
@@ -287,6 +301,23 @@ describe('Montana / parter – ustawienie mebli', () => {
     expect(bad).toEqual([]);
   });
 
+  it('wiatrołap: konsola i siedzisko przy ceglanej ścianie, lustro w czarnej ramie, dywan; korytarz bez konsoli', () => {
+    const types = (room) => furniture.filter((f) => homeRoom(f) === room).map((f) => f.type);
+    expect(types('0/1')).toEqual(expect.arrayContaining(['szafa-wnekowa', 'scianka-szklana-drzwi', 'siedzisko', 'konsola', 'lustro', 'dywan-okragly']));
+    expect(types('0/2')).not.toContain('konsola');
+    const console_ = furniture.find((f) => f.type === 'konsola');
+    for (const [x, y] of corners(console_)) expect(roomAt(x + (console_.x - x) * 0.02, y + (console_.y - y) * 0.02)).toBe('0/1');
+    // ściana wschodnia wiatrołapu (x = 8,80) jest tą w cegle – konsola i siedzisko stoją do niej tyłem
+    expect(finishes['parter:0/1:wall:1'].id).toBe('cegla-stara-czerwona');
+    for (const f of [console_, byId.get('mt-p1-siedzisko')]) {
+      expect(f.rot).toBe(270);
+      expect(aabb(f)[2]).toBeCloseTo(8.8, 6);
+    }
+    expect(getType('konsola').color2).toBeTruthy(); // blat w drugim kolorze
+    expect(console_.color).toBe('#b5895a');
+    for (const id of ['mt-p1-lustro', 'mt-p1-lustro-konsola']) expect(byId.get(id).color).toBe('#2e3033');
+  });
+
   it('krzesła i hokery są wsunięte najwyżej 25 cm, a hokery stoją po stronie jadalni', () => {
     const table = aabb(byId.get('mt-p6-stol'));
     const chairs = furniture.filter((f) => /^mt-p6-krzeslo-/.test(f.id));
@@ -306,24 +337,75 @@ describe('Montana / parter – ustawienie mebli', () => {
     }
   });
 
-  it('wyspa-barek: na granicy kuchni i jadalni, lekko wychodzi w stronę jadalni, fronty do kuchni', () => {
+  it('wyspa-barek: mała, WOLNOSTOJĄCA na granicy kuchni i jadalni, przejścia ≥ 0,90 m z każdej strony, fronty do kuchni', () => {
     const f = byId.get('mt-p5-wyspa-barek');
-    const [x0, , x1] = aabb(f);
+    const [x0, y0, x1, y1] = aabb(f);
     const edge = 9.05; // wschodnia krawędź pomieszczenia 0/5
     expect(x0).toBeLessThan(edge);
     expect(x1 - edge).toBeGreaterThan(0.1);
-    expect(x1 - edge).toBeLessThanOrEqual(0.4);
+    expect(x1 - edge).toBeLessThanOrEqual(0.4); // „delikatnie” wychodzi na jadalnię
     expect(f.rot).toBe(270); // tył (nawis barowy) na wschód = jadalnia
     expect(getType(f.type).color2).toBeTruthy();
-    expect(f.w).toBeLessThanOrEqual(2);
+    expect(Math.max(f.w, f.d)).toBeLessThanOrEqual(1.2); // niewielka
+    // otwarcie kuchnia–jadalnia ma 2,80 m: po 0,90 m przejścia od północy i od południa
+    const room = collision.roomPolygon(LEVEL, '0/5');
+    const ys = room.map((p) => p[1]);
+    expect(y0 - Math.min(...ys)).toBeGreaterThanOrEqual(0.9 - 1e-9);
+    expect(Math.max(...ys) - y1).toBeGreaterThanOrEqual(0.9 - 1e-9);
+    // od każdej ściany i od każdego mebla stojącego (poza hokerami) co najmniej 0,90 m – także po skosie przy narożnikach blatów
+    const MIN = 0.9;
+    const pts = [];
+    for (let x = x0; x <= x1 + 1e-9; x += 0.05) for (let y = y0; y <= y1 + 1e-9; y += 0.05) if (x < x0 + 0.01 || x > x1 - 0.06 || y < y0 + 0.01 || y > y1 - 0.06) pts.push([x, y]);
+    for (const [x, y] of [...pts, ...corners(f)]) {
+      for (const w of walls) expect(distToRect(w.rect, x, y), `ściana ${w.id || w.kind}`).toBeGreaterThanOrEqual(MIN - 1e-9);
+      for (const g of furniture) {
+        if (g === f || !standing(g) || g.type === 'hoker' || bottom(g) >= top(f)) continue;
+        expect(distToFootprint(g, x, y), g.id).toBeGreaterThanOrEqual(MIN - 1e-9);
+      }
+    }
+  });
+
+  it('stół na 6 osób: 6 krzeseł, za każdym krzesłem min. 70 cm wolnego', () => {
+    const table = byId.get('mt-p6-stol');
+    expect(table.type).toBe('stol-6');
+    const chairs = furniture.filter((f) => /^mt-p6-krzeslo-/.test(f.id));
+    expect(chairs).toHaveLength(6);
+    for (const ch of chairs) {
+      // pas 70 cm za oparciem (tył = +y lokalnie)
+      const ly = (ch.d + 0.7) / 2;
+      const zone = aabb({ x: ch.x - ly * Math.sin(ch.rot * RAD), y: ch.y + ly * Math.cos(ch.rot * RAD), rot: ch.rot, w: ch.w, d: 0.7 });
+      expect(intersecting(shrink(zone), (g) => standing(g) && g !== ch), ch.id).toEqual([]);
+      expect(collides({ x: (zone[0] + zone[2]) / 2, y: (zone[1] + zone[3]) / 2, rot: 0, w: zone[2] - zone[0] - 0.01, d: zone[3] - zone[1] - 0.01 }, blockers), ch.id).toBe(false);
+    }
+  });
+
+  it('łazienka 0/3: WC i mała umywalka, przed każdym min. 60 cm wolnego', () => {
+    const items = furniture.filter((f) => homeRoom(f) === '0/3');
+    expect(items.map((f) => f.type).sort()).toEqual(['lustro-okragle', 'umywalka-nablatowa', 'wc-podwieszane']);
+    for (const f of items.filter((g) => !g.z)) {
+      const zone = shrink(frontZone(f, 0.6));
+      expect(intersecting(zone, (g) => standing(g) && g !== f && !g.z), f.id).toEqual([]);
+      for (const [x, y] of [[zone[0], zone[1]], [zone[2], zone[1]], [zone[2], zone[3]], [zone[0], zone[3]]]) expect(roomAt(x, y), f.id).toBe('0/3');
+    }
   });
 });
 
 describe('Montana / parter – drzwi, okna, przejścia', () => {
-  const doors = level.openings.filter((o) => o.kind === 'door');
+  const allDoors = level.openings.filter((o) => o.kind === 'door');
+  const doors = allDoors.filter((o) => !slidingIds.has(o.id)); // rozwierne
 
-  it('łuki otwierania drzwi wewnętrznych są wolne', () => {
-    expect(doors.length).toBe(5);
+  it('drzwi przesuwne do spiżarni: tor skrzydła przy ścianie kuchni wolny, otwór wolny z obu stron', () => {
+    expect(sliding.map((d) => d.id)).toEqual(['DW4']);
+    const d = sliding[0];
+    expect(d.roomId).toBe('0/5'); // skrzydło po stronie kuchni
+    // w pasie przy ścianie nie stoi ani nie wisi nic (dywanów w kuchni nie ma)
+    expect(intersecting(shrink(d.keepClear, 0.001))).toEqual([]);
+    for (const side of [1, -1]) expect(intersecting(zoneBeside(d.opening, 0.8, side), standing), `strona ${side}`).toEqual([]);
+  });
+
+  it('łuki otwierania drzwi rozwiernych są wolne', () => {
+    expect(allDoors.length).toBe(5);
+    expect(doors.length).toBe(4);
     for (const o of doors) {
       const pts = sectorPoints(leafOf(o));
       for (const f of furniture.filter(standing)) {
@@ -332,7 +414,7 @@ describe('Montana / parter – drzwi, okna, przejścia', () => {
     }
   });
 
-  it('po drugiej stronie drzwi wewnętrznych jest 80 cm wolnego dojścia', () => {
+  it('po drugiej stronie drzwi rozwiernych jest 80 cm wolnego dojścia', () => {
     for (const o of doors) {
       const sign = o.swing[0] === '+' ? 1 : -1;
       expect(intersecting(zoneBeside(o, 0.8, -sign), standing), `drzwi ${o.id}`).toEqual([]);
@@ -349,16 +431,19 @@ describe('Montana / parter – drzwi, okna, przejścia', () => {
     expect(y0).toBeGreaterThanOrEqual(p.rect[1] - 1e-9);
     expect(y1).toBeLessThanOrEqual(p.rect[3] + 1e-9);
     expect(f.h).toBeCloseTo(Math.min(p.height, level.ceilingHeight), 6);
-    // skrzydła (do wiatrołapu) mają wolny łuk, a za ścianką w korytarzu zostaje ≥ 1,20 m wolnej szerokości
+    // skrzydła (do korytarza) mają wolny łuk, a po obu stronach ścianki zostaje ≥ 1,20 m wolnej szerokości
     for (const leaf of glassLeaves(f)) {
       const pts = sectorPoints(leaf);
       for (const g of furniture.filter((q) => standing(q) && q !== f)) {
         expect(pts.some(([x, y]) => inFootprint(g, x, y, 1e-4)), `${leaf.id} × ${g.id}`).toBe(false);
       }
     }
-    const band = [x0, y1, x1, y1 + 0.8];
-    const taken = furniture.filter((g) => standing(g) && g !== f && penetration(g, band)).map((g) => [aabb(g)[0], aabb(g)[2]]);
-    expect(widestGap(x0, x1, taken)).toBeGreaterThanOrEqual(1.2);
+    for (const band of [[x0, y1, x1, y1 + 0.9], [x0, y0 - 0.8, x1, y0]]) {
+      const taken = furniture.filter((g) => standing(g) && g !== f && penetration(g, band)).map((g) => [aabb(g)[0], aabb(g)[2]]);
+      expect(widestGap(x0, x1, taken)).toBeGreaterThanOrEqual(1.2);
+    }
+    // w korytarzu, w zasięgu skrzydeł, nie stoi nic
+    expect(intersecting([x0, y1, x1, y1 + 0.9], (g) => standing(g) && g !== f)).toEqual([]);
   });
 
   it('drzwi wejściowe, tarasowe i przeszklenie do podłogi mają 80 cm wolnej podłogi; przed bramą stoi tylko quad', () => {
@@ -379,11 +464,16 @@ describe('Montana / parter – drzwi, okna, przejścia', () => {
     }
   });
 
-  it('otwarcia pod podciągiem: salon–korytarz całe wolne, kuchnia–jadalnia z przejściem ≥ 0,90 m obok wyspy', () => {
+  it('otwarcia pod podciągiem: salon–korytarz całe wolne, kuchnia–jadalnia z przejściem ≥ 0,90 m po OBU stronach wyspy', () => {
     for (const [between, min] of [[['0/2', '0/6'], 3.0], [['0/5', '0/6'], 0.9]]) {
       const p = level.passages.find((q) => between.every((r) => q.between.includes(r)));
       const taken = furniture.filter((f) => standing(f) && penetration(f, p.rect)).map((f) => [aabb(f)[1], aabb(f)[3]]);
       expect(widestGap(p.rect[1], p.rect[3], taken), between.join('–')).toBeGreaterThanOrEqual(min);
+      if (min < 1) {
+        expect(taken).toHaveLength(1); // tylko wyspa
+        expect(taken[0][0] - p.rect[1], 'przejście od południa').toBeGreaterThanOrEqual(min - 1e-9);
+        expect(p.rect[3] - taken[0][1], 'przejście od północy').toBeGreaterThanOrEqual(min - 1e-9);
+      }
     }
   });
 });
@@ -429,7 +519,10 @@ describe('Montana / parter – ciągi komunikacyjne', () => {
     'łazienka (między umywalką a WC)': [6.2, 3.6],
     'schody – pierwszy stopień': [8.8, 6.3],
     'kuchnia – przed lodówką': [5.8, 8.3],
-    'kuchnia – przed zlewem': [7.7, 8.6],
+    'kuchnia – przed zlewem': [7.3, 8.6],
+    'kuchnia – obejście wyspy od północy': [8.95, 9.45],
+    'kuchnia – obejście wyspy od południa': [8.95, 7.45],
+    'wiatrołap – przed konsolą': [8.0, 2.15],
     'spiżarnia': [4.2, 8.2],
     'garaż – środek': [2.7, 2.0],
     'garaż – przed drzwiami do pom. technicznego': [0.95, 6.3],

@@ -1,5 +1,6 @@
 // Testy opcji bryły (design.json) na prawdziwym house.json:
 // pusty design = bryła z projektu; z design.json – lamele przy schodach, stopnie drewniane, sufit otwarty do kalenicy.
+// Drzwi przesuwne, lamele ciągłe przez obie kondygnacje i dodatkowe okna połaciowe: tests/geometry.design2.test.js.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +18,7 @@ import { house, model, trianglesOf, area3, areaPlan, areaUv, triangleCovers, tri
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const design = JSON.parse(readFileSync(join(root, 'design.json'), 'utf8'));
+const designFile = design;
 
 const base = model(); // bryła z projektu (bez design)
 const d = buildHouse(house, design);
@@ -45,7 +47,7 @@ describe('design.json – plik opcji', () => {
     expect(treadOptions({})).toBeNull();
     expect(beamOptions({})).toBeNull();
     expect(slatOptions(undefined)).toBeNull();
-    expect(slatOptions(design)).toEqual({ profile: 0.04, gap: 0.11, color: '#1d1d1f' });
+    expect(slatOptions(design)).toEqual({ profile: 0.04, gap: 0.11, color: '#1d1d1f', continuous: true });
     expect(beamOptions(design).collar.underside).toBe(2.65);
     expect(beamOptions({ openCeiling: { rooms: ['1/9'], beams: { enabled: false } } })).toBeNull();
   });
@@ -91,8 +93,10 @@ describe('sufit otwarty do kalenicy (openCeiling)', () => {
       expect(kinds, id).toEqual(id === '1/9' ? ['slope-N', 'slope-S'] : ['slope-N']);
     }
     // powierzchnie pozostałych pomieszczeń mają te same pola co w projekcie
+    // (wyjątek: skosy z dodatkowymi oknami połaciowymi – sprawdzane w geometry.design2.test.js)
+    const withExtraWindow = ['poddasze:1/4:slope-N', 'poddasze:1/5:slope-S', 'poddasze:1/8:slope-S'];
     for (const s of base.surfaces.values()) {
-      if (OPEN.includes(s.roomId)) continue;
+      if (OPEN.includes(s.roomId) || withExtraWindow.includes(s.id)) continue;
       expect(d.surfaces.get(s.id).areaM2, s.id).toBeCloseTo(s.areaM2, 9);
     }
   });
@@ -180,8 +184,8 @@ describe('sufit otwarty do kalenicy (openCeiling)', () => {
     const cy = (w.cladRect[1] + w.cladRect[3]) / 2;
     expect(tris.some((t) => triangleCoversPlan(t, (w.cladRect[0] + w.cladRect[2]) / 2, cy))).toBe(false);
     expect(tris.some((t) => triangleCoversPlan(t, w.cladRect[0] - 0.05, cy))).toBe(true);
-    // szpalety okien dachowych bez zmian
-    expect(byName(d, 'poddasze:ceiling:reveal').geometry.attributes.position.count).toBe(byName(base, 'poddasze:ceiling:reveal').geometry.attributes.position.count);
+    // szpalety okien z projektu bez zmian; dochodzą tylko szpalety trzech okien dodatkowych (4 czworokąty każdy)
+    expect(byName(d, 'poddasze:ceiling:reveal').geometry.attributes.position.count).toBe(byName(base, 'poddasze:ceiling:reveal').geometry.attributes.position.count + 3 * 24);
   });
 
   it('ściany pomieszczeń otwartych sięgają do skosu; przy kalenicy 1,425 + 0,70 · 4,80', () => {
@@ -314,16 +318,24 @@ describe('sufit otwarty do kalenicy (openCeiling)', () => {
     expect(col.ceilingAt('parter', 2.0, 5.05)).toBeCloseTo(2.7, 9);
     expect(col.ceilingAt('strych', 0, 0)).toBeNull();
     expect(ceilingAtPoint(upper, {}, 2.0, 5.05)).toBeCloseTo(2.55, 9);
-    // rzut blokad spaceru bez zmian
-    for (const id of ['parter', 'poddasze']) expect(col.walls(id)).toEqual(plain.walls(id));
+    // rzut blokad spaceru bez zmian – poza osłoną między biegami, która przy lamelach ciągłych leży w linii lameli (y = 5,83)
+    const between = (w) => /^między biegami/.test(w.id);
+    for (const id of ['parter', 'poddasze']) expect(col.walls(id).filter((w) => !between(w))).toEqual(plain.walls(id).filter((w) => !between(w)));
+    expect(col.walls('poddasze').filter(between).map((w) => w.rect.map((v) => +v.toFixed(3)))).toEqual([[6.28, 5.81, 7.94, 5.85]]);
+    expect(plain.walls('poddasze').filter(between).map((w) => w.rect.map((v) => +v.toFixed(3)))).toEqual([[6.28, 5.75, 7.94, 5.79]]);
   });
 });
 
 describe('schody: lamele i stopnie drewniane', () => {
-  it('lamele stoją na stopniach biegu dolnego i sięgają do spodu stropu; starej balustrady biegu nie ma', () => {
+  it('lamele tylko przy biegu dolnym (bez slats.continuous): stoją na stopniach i sięgają do spodu stropu; starej balustrady biegu nie ma', () => {
+    // wariant opcji sprzed lameli ciągłych – dalej obsługiwany
+    const design = { ...designFile, stairs: { ...designFile.stairs, slats: { ...designFile.stairs.slats, continuous: false } } };
+    const d = buildHouse(house, design);
     expect(byName(d, 'parter:stairs:balustrade')).toBeUndefined();
     // balustrady przy otworze klatki na poddaszu zostają bez zmian
     expect(byName(d, 'poddasze:stairs:balustrade').geometry.attributes.position.count).toBe(byName(base, 'poddasze:stairs:balustrade').geometry.attributes.position.count);
+    expect(byName(d, 'poddasze:stairs:slat')).toBeUndefined();
+    expect(buildCollision(house, design).walls('poddasze')).toEqual(buildCollision(house).walls('poddasze'));
 
     const { slats, rails, profile } = slatLayout(house, design);
     const steps = stairModel(house).steps.filter((s) => s.partIndex === 0);
@@ -420,8 +432,8 @@ describe('bryła z design.json – poprawność ogólna', () => {
     }
     expect(d.stats.drawCalls).toBeLessThan(260);
     expect(d.stats.triangles).toBeLessThan(20000);
-    expect(d.stats.triangles - base.stats.triangles).toBeLessThan(700);
-  });
+    expect(d.stats.triangles - base.stats.triangles).toBeLessThan(1100); // belki, lamele na dwóch kondygnacjach, troje drzwi przesuwnych, trzy okna
+  }, 20000); // sprawdza każdą liczbę każdej siatki – przy obciążonym komputerze nie mieści się w domyślnych 5 s
 
   it('nic z dachu nie wchodzi do pomieszczeń poniżej sufitu (także otwartego)', () => {
     const offenders = [];

@@ -247,7 +247,7 @@ Przycisk w panelu pojawia się sam. Zasady:
 
 `tests/presets.test.js` sprawdza każdą aranżację z rejestru: unikalne `id` mebli, typy i zakresy wymiarów z katalogu, brak kolizji ze ścianami, kominami i schodami, wysokość pod sufitem i skosem, istniejące powierzchnie i materiały pasujące do rodzaju powierzchni, walidację importu bez strat, plik i link tam i z powrotem, a na końcu dodanie z panelu w złożonej aplikacji (wszystkie meble w scenie, wszystkie wykończenia nałożone, bez błędów w konsoli). Wymagania konkretnej aranżacji (łuki drzwi, przejścia 80 cm, nakładanie mebli) mają własne testy: `tests/preset.montana.parter.test.js`, `tests/preset.montana.poddasze.test.js`.
 
-Rozmiar: „Montana” (139 wykończeń, 119 mebli) daje link o długości ok. 4700 znaków przy limicie 6000. Test wymaga co najmniej 500 znaków zapasu – gdy aranżacja urośnie ponad to, trzeba odchudzić dane (mniej drobnych mebli, mniej różnych kolorów ścian), a nie podnosić limit.
+Rozmiar: „Montana” (139 wykończeń, 116 mebli) daje link o długości ok. 4700 znaków przy limicie 6000. Test wymaga co najmniej 500 znaków zapasu – gdy aranżacja urośnie ponad to, trzeba odchudzić dane (mniej drobnych mebli, mniej różnych kolorów ścian), a nie podnosić limit.
 
 ## Skąd się bierze geometria
 
@@ -266,11 +266,18 @@ Główne części pliku: `meta`, `construction`, `levels` (parter i poddasze: `w
 | Opcja | Co zmienia |
 |---|---|
 | `stairs.groundFloorBalustrade: "slats"` + `stairs.slats` (`profile`, `clearGap`, `color`) | zamiast balustrady biegu dolnego czarne pionowe lamele od stopnic do spodu stropu |
+| `stairs.slats.continuous: true` | lamele ciągłe przez obie kondygnacje: w duszy od stopnic do sufitu poddasza i na krawędziach otworu klatki od posadzki do sufitu – zamiast wszystkich balustrad; wejście na schody i wyjście na korytarz wolne, prześwit najwyżej `clearGap` |
 | `stairs.treads` (`tread`, `riser`, `thickness`, `nosing`) | dębowe stopnice na jasnych podstopnicach; rzędne schodów bez zmian |
 | `openCeiling.rooms` (np. `["1/9", "1/10", "1/11"]`) | pomieszczenia bez sufitu płaskiego – skos do kalenicy, ściany do skosu |
 | `openCeiling.beams` (`color`, `enabled`, `collarTies`, `purlins`) | widoczne jętki i płatew w pomieszczeniach otwartych (przekroje i rozstaw przyjęte, nie z projektu więźby) |
+| `doors.sliding` (lista: `id`, `level`, `side`, `slide`, opcjonalnie `travel`) + `doors.leaf` (`overlap`, `thickness`, `wallGap`, `open`, `color`, `railColor`) | drzwi wewnętrzne przesuwne „barn”: gładkie ościeża zamiast ościeżnicy, drewniane skrzydło z poprzeczkami i zastrzałami na czarnej szynie po stronie pomieszczenia `side`, odsuwane w kierunku `slide`; dziś DP1, DP2 (sypialnia 1/9) i DW4 (kuchnia – spiżarnia) |
+| `extraRoofWindows.windows` (lista: `id`, `room`, `slope`, `x`) + `width`, `length`, `rafters` | dodatkowe okna połaciowe budowane jak okna z projektu (otwór w połaci i skosie, szpalet); dziś 78 × 118 w pokojach 1/4, 1/5, 1/8. `rafters` to rozstaw krokwi przepisany z rysunku więźby – okno ma leżeć między krokwiami, a gdy wymaga przesunięcia krokwi, wpis mówi o tym jawnie (`rafterShift`) |
 
-Skutki dla wariantów: w pomieszczeniach otwartych nie ma powierzchni `…:ceiling`, a sypialnia 1/9 dostaje skosy `poddasze:1/9:slope-N` i `slope-S`. Wykończenia zapisane dla powierzchni, których w bieżącej bryle nie ma, są po prostu niewidoczne (własny zapis) albo pomijane z komunikatem (import, link, gotowa aranżacja). Wysokość pomieszczenia w punkcie – także pod skosem otwartego sufitu – zwraca `app.collision.ceilingAt(levelId, x, y)`. Lamele i belki są stałymi elementami bryły (nie da się ich zaznaczyć ani przemalować w aplikacji – kolor ustawia `design.json`). Zmianę opcji sprawdza `tests/geometry.design.test.js`.
+Skutki dla wariantów: w pomieszczeniach otwartych nie ma powierzchni `…:ceiling`, a sypialnia 1/9 dostaje skosy `poddasze:1/9:slope-N` i `slope-S`. Wykończenia zapisane dla powierzchni, których w bieżącej bryle nie ma, są po prostu niewidoczne (własny zapis) albo pomijane z komunikatem (import, link, gotowa aranżacja). Wysokość pomieszczenia w punkcie – także pod skosem otwartego sufitu – zwraca `app.collision.ceilingAt(levelId, x, y)`. Lamele, belki i drzwi przesuwne są stałymi elementami bryły (nie da się ich zaznaczyć ani przemalować w aplikacji – kolor ustawia `design.json`). Dodatkowe okna połaciowe nie zmieniają identyfikatorów powierzchni, tylko pole skosu. `house.json` (i `app.house`) dalej zawiera wyłącznie okna z projektu.
+
+Drzwi przesuwne a meble: skrzydło jeździ po ścianie, więc przy niej musi zostać wolny pas – cały tor skrzydła plus 5 cm, 12,5 cm od lica ściany. Prostokąty podaje `app.collision.slidingDoors(levelId)` (pole `keepClear`); skrzydło nie należy do `app.collision.walls()`, a przez otwór przechodzi się w spacerze jak przez zwykłe drzwi.
+
+Zmianę opcji sprawdzają `tests/geometry.design.test.js` i `tests/geometry.design2.test.js` (drzwi przesuwne, lamele ciągłe, okna dodatkowe – m.in. te same warunki, które `tools/check.mjs` stawia oknom z projektu).
 
 Narzędzia (uruchamiane w Node, czytają tylko `house.json`):
 
@@ -291,7 +298,8 @@ Uwaga: zmiana geometrii może zmienić identyfikatory powierzchni (np. numer śc
 
 ```
 house.json            geometria domu z projektu – źródło wymiarów
-design.json           opcje bryły: jawne odstępstwa od projektu (lamele przy schodach, otwarty sufit z belkami)
+design.json           opcje bryły: jawne odstępstwa od projektu (lamele przy schodach, otwarty sufit z belkami,
+                      drzwi przesuwne, dodatkowe okna połaciowe)
 index.html            strona startowa
 vite.config.js        konfiguracja Vite i testów
 src/

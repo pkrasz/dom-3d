@@ -2,19 +2,23 @@
 // Układ domu, metry.
 import { isVertical } from '../../tools/geometry.mjs';
 import { pointInPolygon, pointInRect, subtractIntervals, distanceToPolygonEdge, distanceToRect, polygonBBox } from './plan.js';
-import { stairModel, balustradeSegments } from './stairs.js';
+import { stairModel, guardSegments } from './stairs.js';
+import { slidingDoorLayout } from './slidingDoors.js';
 import { ceilingAtPoint } from './levelModel.js';
 import { DOOR_FRAME, WALK_MAX_STEP, WALK_MIN_HEADROOM, BALUSTRADE_RAIL } from './constants.js';
 
 /**
  * @param {Object} house    zawartość house.json
- * @param {Object} [design] opcje bryły z design.json – wpływają tylko na ceilingAt (sufit otwarty do kalenicy);
- *                          rzut blokad (ściany, balustrady / lamele) jest taki sam jak w projekcie.
+ * @param {Object} [design] opcje bryły z design.json – wpływają na ceilingAt (sufit otwarty do kalenicy), na listę
+ *                          slidingDoors i na jedną blokadę: przy lamelach ciągłych osłona między biegami schodów
+ *                          leży w linii lameli. Poza tym rzut blokad (ściany, balustrady / lamele) jest jak w projekcie;
+ *                          przez drzwi przesuwne przechodzi się tak samo jak przez rozwierne.
  */
 export function buildCollision(house, design = {}) {
   const levels = house.levels;
   const stairs = stairModel(house);
-  const balustrades = balustradeSegments(house);
+  const balustrades = guardSegments(house, design);
+  const sliding = slidingDoorLayout(house, design);
   const cache = new Map();
 
   /** Prostokąty blokujące ruch na kondygnacji: mury (bez świateł drzwi i przejść), kominy, balustrady. */
@@ -66,6 +70,14 @@ export function buildCollision(house, design = {}) {
   function ceilingAt(levelId, x, y) {
     const level = levelById(levelId);
     return level ? ceilingAtPoint(level, design, x, y) : null;
+  }
+
+  /**
+   * Drzwi przesuwne kondygnacji (design.json → doors.sliding): [{ id, roomId, keepClear, leafRect, trackRect, clearWidth, … }].
+   * keepClear = prostokąt [x0, y0, x1, y1] przy ścianie, który musi zostać wolny od mebli (tor skrzydła + 5 cm).
+   */
+  function slidingDoors(levelId) {
+    return sliding.filter((d) => d.levelId === levelId);
   }
 
   function roomPolygon(levelId, roomId) {
@@ -157,7 +169,7 @@ export function buildCollision(house, design = {}) {
     return { x: edge[0][0] + dir * 0.45, y: (edge[0][1] + edge[1][1]) / 2, z: level.floorLevel, headingDeg: dir > 0 ? 180 : 0 };
   }
 
-  return { walls, pointInRoom, roomPolygon, ceilingAt, levelIdAtHeight, groundAt, roomSpot, stairsSpot, stairs, balustrades };
+  return { walls, pointInRoom, roomPolygon, ceilingAt, slidingDoors, levelIdAtHeight, groundAt, roomSpot, stairsSpot, stairs, balustrades };
 }
 
 /**
