@@ -380,23 +380,25 @@ Katalog `model3d` leży wewnątrz większego repozytorium, więc do publikacji n
 
 1. W katalogu `model3d`: `git init`, `git add .`, `git commit -m "Model 3D domu"` (`node_modules` i `dist` są już w `.gitignore`).
 2. Załóż repozytorium na GitHubie i wypchnij: `gh repo create dom-3d --source . --push --public`. GitHub Pages jest darmowe dla repozytoriów publicznych; dla prywatnych wymaga płatnego planu – a publiczne repozytorium oznacza, że widoczny jest także kod i `house.json`.
-3. Dodaj plik `.github/workflows/pages.yml`:
+3. Dodaj plik `.github/workflows/pages.yml` (w tym projekcie już jest):
 
 ```yaml
 name: Publikacja na GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -406,9 +408,17 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
 ```
