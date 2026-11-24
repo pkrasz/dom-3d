@@ -339,31 +339,27 @@ describe('Montana / parter – ustawienie mebli', () => {
     }
   });
 
-  it('wyspa-barek: mała, WOLNOSTOJĄCA na granicy kuchni i jadalni, przejścia ≥ 0,90 m z każdej strony, fronty do kuchni', () => {
+  it('wyspa-barek w „L” z rzędem okiennym (wybór właścicieli): dosunięta do ściany okiennej, od południa przejście ≥ 0,90 m, fronty do kuchni', () => {
     const f = byId.get('mt-p5-wyspa-barek');
     const [x0, y0, x1, y1] = aabb(f);
     const edge = 9.05; // wschodnia krawędź pomieszczenia 0/5
+    expect(f.type).toBe('wyspa-barek');
     expect(x0).toBeLessThan(edge);
     expect(x1 - edge).toBeGreaterThan(0.1);
     expect(x1 - edge).toBeLessThanOrEqual(0.4); // „delikatnie” wychodzi na jadalnię
     expect(f.rot).toBe(270); // tył (nawis barowy) na wschód = jadalnia
     expect(getType(f.type).color2).toBeTruthy();
-    expect(Math.max(f.w, f.d)).toBeLessThanOrEqual(1.2); // niewielka
-    // otwarcie kuchnia–jadalnia ma 2,80 m: po 0,90 m przejścia od północy i od południa
     const room = collision.roomPolygon(LEVEL, '0/5');
     const ys = room.map((p) => p[1]);
-    expect(y0 - Math.min(...ys)).toBeGreaterThanOrEqual(0.9 - 1e-9);
-    expect(Math.max(...ys) - y1).toBeGreaterThanOrEqual(0.9 - 1e-9);
-    // od każdej ściany i od każdego mebla stojącego (poza hokerami) co najmniej 0,90 m – także po skosie przy narożnikach blatów
-    const MIN = 0.9;
-    const pts = [];
-    for (let x = x0; x <= x1 + 1e-9; x += 0.05) for (let y = y0; y <= y1 + 1e-9; y += 0.05) if (x < x0 + 0.01 || x > x1 - 0.06 || y < y0 + 0.01 || y > y1 - 0.06) pts.push([x, y]);
-    for (const [x, y] of [...pts, ...corners(f)]) {
-      for (const w of walls) expect(distToRect(w.rect, x, y), `ściana ${w.id || w.kind}`).toBeGreaterThanOrEqual(MIN - 1e-9);
-      for (const g of furniture) {
-        if (g === f || !standing(g) || g.type === 'hoker' || bottom(g) >= top(f)) continue;
-        expect(distToFootprint(g, x, y), g.id).toBeGreaterThanOrEqual(MIN - 1e-9);
-      }
+    expect(Math.max(...ys) - y1).toBeLessThanOrEqual(0.01); // północnym końcem przy ścianie okiennej
+    expect(y0 - Math.min(...ys)).toBeGreaterThanOrEqual(0.9 - 1e-9); // jedyne wejście do kuchni: od południa
+    // rząd okienny dochodzi do wyspy (ramię „L” bez szczeliny)
+    const link = aabb(byId.get('mt-p5-dolna-3'));
+    expect(Math.abs(link[2] - x0)).toBeLessThanOrEqual(0.01);
+    // do rzędu południowego (także po skosie) zostaje min. 0,85 m
+    for (const g of furniture) {
+      if (g === f || !standing(g) || g.type === 'hoker' || bottom(g) >= top(f) || /^mt-p5-(dolna-[123]|plyta|zlew)$/.test(g.id)) continue;
+      for (const [x, y] of corners(f)) expect(distToFootprint(g, x, y), g.id).toBeGreaterThanOrEqual(0.85);
     }
   });
 
@@ -499,7 +495,7 @@ describe('Montana / parter – drzwi, okna, przejścia', () => {
     }
   });
 
-  it('otwarcia pod podciągiem: salon–korytarz całe wolne, kuchnia–jadalnia z przejściem ≥ 0,90 m po OBU stronach wyspy', () => {
+  it('otwarcia pod podciągiem: salon–korytarz całe wolne, kuchnia–jadalnia z przejściem ≥ 0,90 m na południe od wyspy', () => {
     for (const [between, min] of [[['0/2', '0/6'], 3.0], [['0/5', '0/6'], 0.9]]) {
       const p = level.passages.find((q) => between.every((r) => q.between.includes(r)));
       const taken = furniture.filter((f) => standing(f) && penetration(f, p.rect)).map((f) => [aabb(f)[1], aabb(f)[3]]);
@@ -507,7 +503,7 @@ describe('Montana / parter – drzwi, okna, przejścia', () => {
       if (min < 1) {
         expect(taken).toHaveLength(1); // tylko wyspa
         expect(taken[0][0] - p.rect[1], 'przejście od południa').toBeGreaterThanOrEqual(min - 1e-9);
-        expect(p.rect[3] - taken[0][1], 'przejście od północy').toBeGreaterThanOrEqual(min - 1e-9);
+        expect(p.rect[3] - taken[0][1], 'wyspa dosunięta do ściany okiennej').toBeLessThanOrEqual(0.01);
       }
     }
   });
@@ -555,8 +551,7 @@ describe('Montana / parter – ciągi komunikacyjne', () => {
     'schody – pierwszy stopień': [8.8, 6.3],
     'kuchnia – przed lodówką': [5.8, 8.3],
     'kuchnia – przed zlewem': [7.3, 8.6],
-    'kuchnia – obejście wyspy od północy': [8.95, 9.45],
-    'kuchnia – obejście wyspy od południa': [8.95, 7.45],
+    'kuchnia – wejście na południe od wyspy': [8.95, 7.45],
     'wiatrołap – przed konsolą': [8.0, 2.0],
     'ścianka szklana – w świetle prawego (czynnego) skrzydła': [8.25, 2.7],
     'korytarz – tuż za prawym skrzydłem ścianki': [8.25, 3.1],

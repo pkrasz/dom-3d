@@ -150,13 +150,14 @@ export const furniture = [
   { id: 'mt-p4-regal-polnoc', type: 'regal-magazynowy', levelId: P, x: 4.065, y: 9.65, rot: 0, w: 1.966, d: 0.4, h: 2.2, color: DAB, color2: CZARNY },
   { id: 'mt-p4-regal-wschod', type: 'regal-magazynowy', levelId: P, x: 4.9, y: 7.75, rot: 270, w: 1.2, d: 0.3, h: 2.2, color: DAB, color2: CZARNY },
 
-  // ============ 0/5 Kuchnia (3,75 × 2,80): dwa krótkie rzędy + WOLNOSTOJĄCA wyspa-barek na granicy z jadalnią
-  // rząd północny (blat 0,90 ≤ parapet 0,91): szafka, płyta, szafka, zlew pod oknem. Kończy się na x = 7,70,
-  // żeby obejście wyspy od północy miało 0,90 m; zaczyna na y = 9,25 – tuż za pasem drzwi przesuwnych spiżarni.
-  { id: 'mt-p5-dolna-1', type: 'kuchnia-dolna', levelId: P, x: 5.6, y: 9.55, rot: 0, w: 0.6, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-plyta', type: 'kuchnia-plyta', levelId: P, x: 6.2, y: 9.55, rot: 0, w: 0.6, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-dolna-2', type: 'kuchnia-dolna', levelId: P, x: 6.7, y: 9.55, rot: 0, w: 0.4, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
-  { id: 'mt-p5-zlew', type: 'kuchnia-zlew', levelId: P, x: 7.3, y: 9.55, rot: 0, w: 0.8, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  // ============ 0/5 Kuchnia (3,75 × 2,80): dwa rzędy + wyspa-barek w „L” z rzędem okiennym, na granicy z jadalnią
+  // rząd północny pod oknem (blat 0,90 ≤ parapet 0,91): szafka, płyta, szafka, zlew pod oknem, szafka łącząca z wyspą.
+  // Zaczyna na y = 9,25 – tuż za pasem drzwi przesuwnych spiżarni.
+  { id: 'mt-p5-dolna-1', type: 'kuchnia-dolna', levelId: P, x: 5.65, y: 9.55, rot: 0, w: 0.7, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-plyta', type: 'kuchnia-plyta', levelId: P, x: 6.3, y: 9.55, rot: 0, w: 0.6, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-dolna-2', type: 'kuchnia-dolna', levelId: P, x: 6.95, y: 9.55, rot: 0, w: 0.7, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-zlew', type: 'kuchnia-zlew', levelId: P, x: 7.7, y: 9.55, rot: 0, w: 0.8, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
+  { id: 'mt-p5-dolna-3', type: 'kuchnia-dolna', levelId: P, x: 8.275, y: 9.55, rot: 0, w: 0.35, d: 0.6, h: 0.9, color: KASZMIR, color2: DAB },
   // szafki wiszące na lewo od okna (nad płytą – miejsce na okap w zabudowie)
   { id: 'mt-p5-gorna-polnoc', type: 'kuchnia-gorna', levelId: P, x: 5.95, y: 9.675, rot: 0, w: 1.3, d: 0.35, h: 0.75, color: KASZMIR, z: 1.45 },
   // rząd południowy: lodówka w zabudowie, słupek z piekarnikiem, blat pomocniczy z szafkami wiszącymi.
@@ -165,12 +166,14 @@ export const furniture = [
   { id: 'mt-p5-piekarnik', type: 'kuchnia-piekarnik', levelId: P, x: 6.33, y: 7.375, rot: 180, w: 0.6, d: 0.65, h: 2.2, color: KASZMIR },
   { id: 'mt-p5-dolna-4', type: 'kuchnia-dolna', levelId: P, x: 7.13, y: 7.375, rot: 180, w: 1, d: 0.65, h: 0.9, color: KASZMIR, color2: DAB },
   { id: 'mt-p5-gorna-poludnie', type: 'kuchnia-gorna', levelId: P, x: 7.13, y: 7.225, rot: 180, w: 1, d: 0.35, h: 0.75, color: KASZMIR, z: 1.45 },
-  // wyspa-barek 1,00 × 0,70 m, wolnostojąca: przejścia po 0,90 m od północy i od południa (otwarcie ma 2,80 m),
-  // fronty do kuchni (zachód), nawis barowy po stronie jadalni; wychodzi 25 cm poza linię kuchni.
-  { id: 'mt-p5-wyspa-barek', type: 'wyspa-mala', levelId: P, x: 8.95, y: 8.45, rot: 270, w: 1, d: 0.7, h: 0.92, color: KASZMIR, color2: DAB },
-  // dwa hokery po stronie jadalni (wsunięte 15 cm pod nawis)
-  { id: 'mt-p6-hoker-1', type: 'hoker', levelId: P, x: 9.36, y: 8.2, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
-  { id: 'mt-p6-hoker-2', type: 'hoker', levelId: P, x: 9.36, y: 8.7, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
+  // wyspa-barek 1,80 × 0,90 m w „L” z rzędem okiennym (wybór właścicieli – wersja pierwsza): północnym końcem
+  // dosunięta do ściany okiennej, od południa wolne przejście 1,00 m; fronty do kuchni (zachód), nawis barowy 30 cm
+  // po stronie jadalni; wychodzi 30 cm poza linię kuchni.
+  { id: 'mt-p5-wyspa-barek', type: 'wyspa-barek', levelId: P, x: 8.9, y: 8.95, rot: 270, w: 1.8, d: 0.9, h: 0.92, color: KASZMIR, color2: DAB },
+  // trzy hokery po stronie jadalni (wsunięte pod nawis)
+  { id: 'mt-p6-hoker-1', type: 'hoker', levelId: P, x: 9.4, y: 8.4, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
+  { id: 'mt-p6-hoker-2', type: 'hoker', levelId: P, x: 9.4, y: 8.95, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
+  { id: 'mt-p6-hoker-3', type: 'hoker', levelId: P, x: 9.4, y: 9.5, rot: 270, w: 0.4, d: 0.42, h: 0.9, color: DAB, color2: CZARNY },
 
   // ============ 0/6 Jadalnia (część salonu przy kuchni): stół na 6 osób równolegle do wyspy, 6 krzeseł
   { id: 'mt-p6-stol', type: 'stol-6', levelId: P, x: 11.5, y: 7.8, rot: 90, w: 1.8, d: 0.9, h: 0.76, color: DAB, color2: CZARNY },
