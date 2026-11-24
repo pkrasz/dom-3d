@@ -431,3 +431,211 @@ describe('wykończenia – liczby, szacunki, dane', () => {
     expect(() => createRecent(null).add({ kind: 'paint', color: '#ffffff' })).not.toThrow();
   });
 });
+
+describe('wykończenia – materiały stylu Montana', () => {
+  const NEW_IDS = [
+    'gres-jodelka-dab-cieply', 'gres-jodelka-dab-jasny', 'gres-jodelka-dab-miodowy',
+    'patchwork-bialo-czarny', 'plytka-gwiazdka-bialo-czarna', 'patchwork-szaro-niebieski',
+    'cegla-stara-czerwona', 'cegla-bielona',
+    'deski-scienne-stare-cieple', 'deski-scienne-stare-miodowe',
+    'lastryko-cieple', 'plytka-terakota-30x60', 'plytka-terakota-7x30', 'plyta-bezowa-60x120',
+    'panel-dab-cieply', 'kamien-kominkowy-cieply', 'tynk-strukturalny-jasny', 'tynk-strukturalny-bezowy', 'posadzka-zywica-szara',
+  ];
+
+  /** Atrapa kontekstu 2D: zapisuje wywołania i pilnuje, żeby współrzędne były skończonymi liczbami. */
+  function recorder() {
+    const calls = {};
+    const fills = []; // fillStyle w chwili każdego fillRect
+    const bad = []; // wywołania z NaN / Infinity
+    const gradient = { addColorStop() {} };
+    const target = {};
+    const ctx = new Proxy(target, {
+      get(t, key) {
+        if (key in t) return t[key];
+        if (key === 'createRadialGradient' || key === 'createLinearGradient') return () => gradient;
+        if (key === 'getImageData') return (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4) });
+        return (...args) => {
+          calls[key] = (calls[key] || 0) + 1;
+          if (['fillRect', 'rect', 'moveTo', 'lineTo', 'arc', 'ellipse', 'bezierCurveTo'].includes(key)) {
+            for (const a of args) if (typeof a === 'number' && !Number.isFinite(a)) bad.push(`${String(key)}(${args.join(', ')})`);
+          }
+          if (key === 'fillRect') fills.push(t.fillStyle);
+        };
+      },
+      set(t, key, value) {
+        t[key] = value;
+        return true;
+      },
+    });
+    return { ctx, calls, fills, bad };
+  }
+
+  it('każdy nowy materiał jest w bibliotece i przechodzi walidację wykończenia', () => {
+    for (const id of NEW_IDS) {
+      const def = libraryMaterial(id);
+      expect(def, id).toBeTruthy();
+      expect(normalizeFinish({ kind: 'material', id, rot: 90 }), id).toEqual({ kind: 'material', id, rot: 90 });
+    }
+    // podłogi z życzeń: jodełka z gresu, patchworki, lastryko, panele i posadzka garażu pasują do podłogi
+    for (const id of ['gres-jodelka-dab-cieply', 'gres-jodelka-dab-jasny', 'patchwork-bialo-czarny', 'patchwork-szaro-niebieski', 'lastryko-cieple', 'plyta-bezowa-60x120', 'panel-dab-cieply', 'posadzka-zywica-szara']) {
+      expect(materialFits(libraryMaterial(id), 'floor'), id).toBe(true);
+    }
+    // ściany: cegła, deski, lastryko, terakota, beżowa płyta, kamień kominkowy, tynk
+    for (const id of ['cegla-stara-czerwona', 'cegla-bielona', 'deski-scienne-stare-cieple', 'lastryko-cieple', 'plytka-terakota-30x60', 'plytka-terakota-7x30', 'plyta-bezowa-60x120', 'kamien-kominkowy-cieply', 'tynk-strukturalny-jasny']) {
+      expect(materialFits(libraryMaterial(id), 'wall'), id).toBe(true);
+      expect(materialFits(libraryMaterial(id), 'chimney'), id).toBe(true);
+    }
+    expect(materialFits(libraryMaterial('cegla-stara-czerwona'), 'floor')).toBe(false);
+  });
+
+  it('skala = prawdziwy rozmiar elementu; tekstura mieści się w 1024 px', () => {
+    for (const id of NEW_IDS) {
+      const def = libraryMaterial(id);
+      for (const rot of [0, 90]) {
+        const p = materialParams({ kind: 'material', id, rot }, def);
+        expect(p.size, id).toEqual(def.size);
+        const L = textureLayout(def, p);
+        expect(Math.max(L.pxW, L.pxH), id).toBeLessThanOrEqual(MAX_TEXTURE_PX);
+        const t = textureTransform(L, rot);
+        expect(t.repeat[0], id).toBeCloseTo(1 / L.cellW, 12);
+        expect(t.repeat[1], id).toBeCloseTo(1 / L.cellH, 12);
+        if (def.texture.draw === 'tiles' || def.texture.draw === 'planks') {
+          expect(L.cellW / L.nx, id).toBeCloseTo(def.size[0], 12);
+          expect(L.cellH / L.ny, id).toBeCloseTo(def.size[1], 12);
+        } else if (def.texture.draw === 'herringbone') {
+          const n = Math.round(def.size[1] / def.size[0]);
+          expect(L.n, id).toBe(n);
+          expect(L.cellW, id).toBeCloseTo(2 * n * def.size[0], 12); // kwadrat siatki = szerokość elementu
+          expect(L.cellH, id).toBeCloseTo(L.cellW, 12);
+        } else {
+          expect([L.cellW, L.cellH], id).toEqual(def.size);
+        }
+      }
+    }
+    // rozmiary z życzeń
+    expect(libraryMaterial('gres-jodelka-dab-cieply').size).toEqual([0.15, 0.9]);
+    expect(libraryMaterial('patchwork-bialo-czarny').size).toEqual([0.2, 0.2]);
+    expect(libraryMaterial('patchwork-szaro-niebieski').size).toEqual([0.2, 0.2]);
+    expect(libraryMaterial('cegla-stara-czerwona').size).toEqual([0.25, 0.065]);
+    expect(libraryMaterial('lastryko-cieple').size).toEqual([0.6, 0.6]);
+    expect(libraryMaterial('plyta-bezowa-60x120').size).toEqual([0.6, 1.2]);
+    const board = libraryMaterial('deski-scienne-stare-cieple').size[1];
+    expect(board).toBeGreaterThanOrEqual(0.14);
+    expect(board).toBeLessThanOrEqual(0.2);
+  });
+
+  it('każdy nowy materiał rysuje się bez błędu: obrót, własny rozmiar, fuga, każdy format, miniatura', () => {
+    for (const id of NEW_IDS) {
+      const def = libraryMaterial(id);
+      const variants = [
+        { rot: 0 },
+        { rot: 90 },
+        { rot: 0, size: [0.33, 0.47] },
+        { rot: 0, size: [SIZE_MIN, 0.5] },
+        { rot: 90, grout: '#222325', groutWidth: 0.005 },
+        { rot: 0, groutWidth: 0 },
+        { rot: 0, pattern: 'straight' },
+        { rot: 0, pattern: 'brick' },
+        ...(def.formats ? FORMATS[def.formats].map((f) => ({ rot: 0, size: f.size })) : []),
+      ];
+      for (const v of variants) {
+        const p = materialParams({ kind: 'material', id, ...v }, def);
+        for (const maxPx of [MAX_TEXTURE_PX, 96]) {
+          const r = recorder();
+          const L = textureLayout(def, p, maxPx);
+          expect(() => drawMaterial(r.ctx, def, p, L), `${id} ${JSON.stringify(v)}`).not.toThrow();
+          expect(r.calls.fillRect, id).toBeGreaterThan(0);
+          expect(r.bad, `${id} ${JSON.stringify(v)}`).toEqual([]);
+        }
+      }
+    }
+  });
+
+  it('materiały działają w podziale „płytki do wysokości”', () => {
+    for (const id of ['cegla-stara-czerwona', 'lastryko-cieple', 'plytka-terakota-7x30', 'deski-scienne-stare-cieple', 'plyta-bezowa-60x120']) {
+      const split = { kind: 'split', height: 1.2, lower: { kind: 'material', id, rot: 0 }, upper: { kind: 'paint', color: '#f2ede4' } };
+      const norm = normalizeFinish(split, { kind: 'wall' });
+      expect(norm.lower.id, id).toBe(id);
+      expect(finishUsesMaterial(norm, id)).toBe(true);
+      expect(finishKey(norm)).toContain(id);
+    }
+  });
+
+  it('gres w jodełkę: fuga w kolorze i szerokości z opcji, „bez fugi” jej nie rysuje', () => {
+    const def = libraryMaterial('gres-jodelka-dab-cieply');
+    expect(def.texture.tileJoint).toBe(true);
+    expect(def.grout.width).toBeGreaterThan(0);
+    const draw = (finish) => {
+      const p = materialParams({ kind: 'material', id: def.id, rot: 0, ...finish }, def);
+      const L = textureLayout(def, p);
+      const r = recorder();
+      drawMaterial(r.ctx, def, p, L);
+      return { p, L, fills: r.fills };
+    };
+    const std = draw({});
+    expect(std.L.groutPx).toBeGreaterThanOrEqual(1);
+    // jedna fuga wzdłuż każdego z 4n² kwadratów siatki + końce elementów (4n elementów w komórce)
+    const n = std.L.n;
+    expect(std.fills.filter((f) => f === def.grout.color).length).toBe(4 * n * n + 4 * n);
+    const custom = draw({ grout: '#222325', groutWidth: 0.005 });
+    expect(custom.L.groutPx).toBeGreaterThan(std.L.groutPx);
+    expect(custom.fills.filter((f) => f === '#222325').length).toBe(4 * n * n + 4 * n);
+    expect(custom.fills).not.toContain(def.grout.color);
+    const none = draw({ groutWidth: 0 });
+    expect(none.L.groutPx).toBe(0);
+    expect(none.fills).not.toContain(def.grout.color);
+    // format 20 × 120 z listy
+    expect(FORMATS.herringboneTile.some((f) => f.size[0] === 0.2 && f.size[1] === 1.2)).toBe(true);
+    // klasyczna jodełka drewniana zostaje bez zmian: półprzezroczysta szczelina
+    expect(libraryMaterial('jodelka-dab').texture.tileJoint).toBeUndefined();
+  });
+
+  it('cegła: układ wozówkowy, jasna fuga, dużo rzędów w komórce; deski ścienne poziome z cienką szczeliną', () => {
+    const def = libraryMaterial('cegla-stara-czerwona');
+    const p = materialParams({ rot: 0 }, def);
+    expect(p.pattern).toBe('brick');
+    expect(p.groutWidth).toBeCloseTo(0.01, 12);
+    const L = textureLayout(def, p);
+    expect(L.ny % 2).toBe(0);
+    expect(L.ny).toBeGreaterThanOrEqual(12);
+    expect(L.groutPx).toBeGreaterThanOrEqual(2);
+    expect(new Set(def.colors).size).toBeGreaterThanOrEqual(6); // nierówne odcienie
+    expect(libraryMaterial('cegla-bielona').colors[0]).not.toBe(def.colors[0]);
+
+    const boards = libraryMaterial('deski-scienne-stare-cieple');
+    expect(boards.size[0]).toBeGreaterThan(boards.size[1]); // deska leży poziomo (długość wzdłuż u)
+    const bp = materialParams({ rot: 0 }, boards);
+    const BL = textureLayout(boards, bp);
+    expect(BL.groutPx).toBe(1);
+    const r = recorder();
+    drawMaterial(r.ctx, boards, bp, BL);
+    expect(r.calls.ellipse).toBeGreaterThan(0); // sęki
+    expect(r.calls.bezierCurveTo).toBeGreaterThan(0); // słoje
+  });
+
+  it('patchwork: kilka różnych wzorów w komórce; lastryko: okruchy wielokątne w ciepłej gamie', () => {
+    for (const id of ['patchwork-bialo-czarny', 'patchwork-szaro-niebieski']) {
+      const def = libraryMaterial(id);
+      const p = materialParams({ rot: 0 }, def);
+      const L = textureLayout(def, p);
+      expect(L.nx * L.ny, id).toBeGreaterThanOrEqual(16); // komórka mieści wiele różnych płytek
+      const r = recorder();
+      drawMaterial(r.ctx, def, p, L);
+      expect(r.calls.ellipse, id).toBeGreaterThan(0); // kwiatki
+      expect(r.calls.lineTo, id).toBeGreaterThan(0); // gwiazdki
+      expect(new Set(def.texture.motifs.map((m) => m.split(':')[0])).size, id).toBeGreaterThanOrEqual(3);
+    }
+    expect(libraryMaterial('patchwork-szaro-niebieski').texture.inks.length).toBeGreaterThanOrEqual(4);
+
+    const def = libraryMaterial('lastryko-cieple');
+    expect(def.texture.chips.length).toBeGreaterThanOrEqual(6);
+    const p = materialParams({ rot: 0 }, def);
+    const L = textureLayout(def, p);
+    const r = recorder();
+    drawMaterial(r.ctx, def, p, L);
+    // ok. 2200 okruchów na m² – wyraźnie więcej wielokątów niż płytek
+    expect(r.calls.closePath).toBeGreaterThan(500 * L.nx * L.ny);
+    // 60 × 120 jest na liście formatów
+    expect(FORMATS[def.formats].some((f) => f.size[0] === 0.6 && f.size[1] === 1.2)).toBe(true);
+  });
+});

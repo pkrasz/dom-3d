@@ -1,7 +1,9 @@
 // Schody S1 wg levels[0].stairs: biegi proste, stopnie zabiegowe, płyta pod spodem (uproszczona), balustrady.
 // stairModel() daje też funkcje wysokości stopnia i spodu płyty – używa ich tryb spaceru.
+// Opcje bryły (design.json): stopnice drewniane z jasnymi podstopnicami oraz lamele zamiast balustrady biegu dolnego.
 import { pointInPolygon, pointInRect, EPS } from './plan.js';
 import { BALUSTRADE_POST, BALUSTRADE_RAIL, BALUSTRADE_POST_SPACING, BALUSTRADE_SIDE_OFFSET } from './constants.js';
+import { slatOptions, treadOptions } from './design.js';
 
 /**
  * Lista stopni: { k (numer 1..n), top (rzędna stopnicy), poly (rzut), kind, x0/x1/dir dla biegu prostego }.
@@ -96,10 +98,35 @@ export function stairModel(house) {
   };
 }
 
-export function emitStairs(house, batch) {
+export function emitStairs(house, batch, design = {}) {
   const model = stairModel(house);
   if (!model) return;
   const levelId = house.levels[0].id;
+  const wood = treadOptions(design);
+  if (wood) {
+    // Opcja bryły: stopnica = deska (ciepłe drewno) na jasnej bryle stopnia; podstopnica i boki w kolorze jasnym.
+    const body = batch('stairRiser', 'stairs', levelId);
+    for (const s of model.steps) {
+      // co druga stopnica o ton ciemniejsza – w widoku z góry widać podział na stopnie
+      const board = batch(s.k % 2 ? 'stairTread' : 'stairTreadAlt', 'stairs', levelId);
+      const zb = s.top - wood.thickness;
+      if (s.kind === 'flight') {
+        body.hexa(
+          [
+            [s.a, s.y0, s.soffitA], [s.b, s.y0, s.soffitB], [s.b, s.y1, s.soffitB], [s.a, s.y1, s.soffitA],
+            [s.a, s.y0, zb], [s.b, s.y0, zb], [s.b, s.y1, zb], [s.a, s.y1, zb],
+          ],
+          ['top']
+        );
+        const nose = s.a - s.dir * wood.nosing; // nosek wysunięty przed podstopnicę
+        board.box(Math.min(nose, s.b), s.y0, zb, Math.max(nose, s.b), s.y1, s.top);
+      } else {
+        body.prism(s.poly, s.soffitA, zb, ['top']);
+        board.prism(s.poly, zb, s.top);
+      }
+    }
+    return;
+  }
   for (const s of model.steps) {
     // co drugi stopień o ton ciemniejszy – w widoku z góry widać podział na stopnie
     const b = batch(s.k % 2 ? 'stairs' : 'stairsAlt', 'stairs', levelId);
@@ -155,15 +182,66 @@ export function balustradeSegments(house) {
     }
     const zFrom = bal.type === 'raked' ? bal.baseFrom : bal.base;
     const zTo = bal.type === 'raked' ? bal.baseTo : bal.base;
-    out.push({ levelId, from, to, zFrom, zTo, height, type: bal.type, label: bal.label });
+    out.push({ levelId, from, to, zFrom, zTo, height, type: bal.type, label: bal.label, partIndex: follows ? Number(follows[1]) : null });
   };
   for (const bal of st.balustrades || []) add(parter.id, bal, st.balustradeHeight);
   for (const bal of upper?.stairVoid?.balustrades || []) add(upper.id, bal, upper.stairVoid.balustradeHeight);
   return out;
 }
 
-export function emitBalustrades(house, batch) {
+/** Czy ten odcinek balustrady zastępują lamele (opcja bryły: bieg na najniższej kondygnacji). */
+const replacedBySlats = (house, seg, design) =>
+  !!slatOptions(design) && seg.levelId === house.levels[0].id && seg.type === 'raked' && seg.partIndex !== null;
+
+/**
+ * Lamele zamiast balustrady biegu (design.stairs.groundFloorBalustrade = 'slats'): pionowe profile od stopnic
+ * do spodu stropu, w linii dawnej balustrady. Nad biegiem, gdzie stropu nie ma (otwór klatki), lamele spina
+ * poziomy profil na wysokości spodu stropu.
+ * Zwraca { slats: [{ x, y, z0, z1, underSlab }], rails: [{ from, to, z }], profile } – same dane (testy, podgląd).
+ */
+export function slatLayout(house, design = {}) {
+  const opt = slatOptions(design);
+  const out = { slats: [], rails: [], profile: opt?.profile ?? 0 };
+  const model = opt ? stairModel(house) : null;
+  if (!model) return out;
+  const level = house.levels[0];
+  const top = level.floorLevel + level.ceilingHeight; // spód stropu
+  const voidRect = level.slabAbove?.openings?.find((o) => o.kind === 'stairs')?.rect || null;
+  const p = opt.profile;
   for (const seg of balustradeSegments(house)) {
+    if (!replacedBySlats(house, seg, design)) continue;
+    const y = seg.from[1]; // biegi w projekcie idą wzdłuż x (jak w stairModel)
+    const open = []; // położenia lameli pod otworem klatki
+    for (const s of model.steps.filter((st) => st.partIndex === seg.partIndex && st.kind === 'flight')) {
+      const n = Math.max(1, Math.round(Math.abs(s.b - s.a) / (p + opt.gap)));
+      for (let i = 0; i < n; i++) {
+        const x = s.a + ((s.b - s.a) * (i + 0.5)) / n;
+        const underSlab = !(voidRect && pointInRect(x, y, voidRect));
+        if (!underSlab) open.push(x);
+        out.slats.push({ x, y, z0: s.top, z1: underSlab ? top : top - p, underSlab });
+      }
+    }
+    if (open.length) {
+      // profil górny: od skrajnej lameli do krawędzi stropu (albo do drugiej skrajnej lameli)
+      let x0 = Math.min(...open) - p / 2;
+      let x1 = Math.max(...open) + p / 2;
+      if (voidRect && out.slats.some((sl) => sl.underSlab && sl.x > x1)) x1 = voidRect[2];
+      if (voidRect && out.slats.some((sl) => sl.underSlab && sl.x < x0)) x0 = voidRect[0];
+      out.rails.push({ from: [x0, y], to: [x1, y], z: top - p / 2 });
+    }
+  }
+  return out;
+}
+
+export function emitBalustrades(house, batch, design = {}) {
+  for (const seg of balustradeSegments(house)) {
+    if (replacedBySlats(house, seg, design)) continue;
     emitBalustrade(batch('balustrade', 'stairs', seg.levelId), seg.from, seg.to, seg.zFrom, seg.zTo, seg.height);
   }
+  const { slats, rails, profile } = slatLayout(house, design);
+  if (!slats.length) return;
+  const b = batch('slat', 'stairs', house.levels[0].id, { noPick: true }); // dotknięcie przechodzi do ściany za lamelami
+  const h = profile / 2;
+  for (const s of slats) b.box(s.x - h, s.y - h, s.z0, s.x + h, s.y + h, s.z1, ['bottom', 'top']);
+  for (const r of rails) b.bar([...r.from, r.z], [...r.to, r.z], profile, profile);
 }

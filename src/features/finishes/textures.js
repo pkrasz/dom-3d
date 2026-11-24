@@ -45,7 +45,8 @@ export function textureLayout(def, params, maxPx = MAX_TEXTURE_PX) {
     ny = h < 1 ? 2 : 1;
   } else if (draw === 'tiles') {
     nx = clampInt(Math.ceil(1.2 / w - 1e-9), 2, 8);
-    ny = clampInt(Math.ceil(1.2 / h - 1e-9), 2, 8);
+    // cegła: więcej rzędów w komórce, żeby różne odcienie cegieł nie układały się w widoczne pasy
+    ny = clampInt(Math.ceil(1.2 / h - 1e-9), 2, def.texture.look === 'brick' ? 16 : 8);
     if (params.pattern === 'brick' && ny % 2) ny += 1; // cegiełka powtarza się co 2 rzędy
   }
 
@@ -58,7 +59,7 @@ export function textureLayout(def, params, maxPx = MAX_TEXTURE_PX) {
   const groutM = params.groutWidth || 0;
   let groutPx = 0;
   if (groutM > 0) {
-    const min = draw === 'tiles' ? MIN_GROUT_PX : 1;
+    const min = draw === 'tiles' && !def.texture.thinJoint ? MIN_GROUT_PX : 1;
     groutPx = Math.min(Math.max(min, Math.round(groutM * (ex / ew))), Math.max(1, Math.floor(Math.min(ex, ey) / 3)));
   }
   return { draw, nx, ny, cellW, cellH, ex, ey, pxW: nx * ex, pxH: ny * ey, groutPx, ...(n ? { n } : {}) };
@@ -112,7 +113,7 @@ const rgba = (hex, alpha) => {
 };
 
 /** Wypełnienie jednego elementu (płytki / deski) w prostokącie x, y, w, h – wszystko przycięte do prostokąta. */
-function drawElement(ctx, def, rand, x, y, w, h, image) {
+function drawElement(ctx, def, rand, x, y, w, h, image, ppm = DENSITY) {
   if (w <= 0 || h <= 0) return;
   const look = def.texture.look;
   const base = def.colors[Math.floor(rand() * def.colors.length)] || '#bbbbbb';
@@ -170,6 +171,14 @@ function drawElement(ctx, def, rand, x, y, w, h, image) {
     }
   } else if (look === 'wood') {
     woodGrain(ctx, rand, x, y, w, h, h >= w);
+  } else if (look === 'oldwood') {
+    oldWood(ctx, rand, x, y, w, h, h >= w);
+  } else if (look === 'brick') {
+    brickFace(ctx, def, rand, x, y, w, h);
+  } else if (look === 'terrazzo') {
+    terrazzo(ctx, def, rand, x, y, w, h, ppm);
+  } else if (look === 'patchwork') {
+    patchwork(ctx, def, rand, base, x, y, w, h);
   } else if (look === 'slate') {
     // poziome warstwy o różnej jasności
     const horizontal = w >= h;
@@ -215,18 +224,262 @@ function woodGrain(ctx, rand, x, y, w, h, vertical) {
   }
 }
 
+/** Postarzana deska: pasy przetarć, gęste słoje, sęki i drobne pęknięcia wzdłuż włókien. */
+function oldWood(ctx, rand, x, y, w, h, vertical) {
+  const across = vertical ? w : h;
+  const along = vertical ? h : w;
+  /** Prostokąt w układzie deski: a – wzdłuż włókien, o – w poprzek. */
+  const rect = (a, o, la, lo) => (vertical ? ctx.fillRect(x + o, y + a, lo, la) : ctx.fillRect(x + a, y + o, la, lo));
+  const bands = 3 + Math.floor(rand() * 3);
+  for (let i = 0; i < bands; i++) {
+    ctx.fillStyle = `rgba(${rand() < 0.6 ? '45,26,10' : '255,236,205'},${0.04 + rand() * 0.07})`;
+    rect(0, rand() * across, along, across * (0.08 + rand() * 0.25));
+  }
+  woodGrain(ctx, rand, x, y, w, h, vertical);
+  woodGrain(ctx, rand, x, y, w, h, vertical);
+  const knots = rand() < 0.55 ? 1 + Math.floor(rand() * 2) : 0;
+  for (let i = 0; i < knots; i++) {
+    const a = (0.08 + rand() * 0.84) * along;
+    const o = (0.25 + rand() * 0.5) * across;
+    const r = across * (0.07 + rand() * 0.09);
+    const cx = vertical ? x + o : x + a;
+    const cy = vertical ? y + a : y + o;
+    const rx = vertical ? r : r * 1.7;
+    const ry = vertical ? r * 1.7 : r;
+    ctx.fillStyle = 'rgba(52,30,14,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(52,30,14,0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx * 1.8, ry * 1.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const cracks = Math.floor(rand() * 3);
+  ctx.fillStyle = 'rgba(40,22,10,0.3)';
+  for (let i = 0; i < cracks; i++) rect(rand() * along * 0.8, rand() * across, along * (0.05 + rand() * 0.15), 1);
+}
+
+/** Lico starej cegły: plamy wypału, ziarno i delikatny relief krawędzi. */
+function brickFace(ctx, def, rand, x, y, w, h) {
+  for (let i = 0; i < 4; i++) {
+    const cx = x + rand() * w;
+    const cy = y + rand() * h;
+    const r = w * (0.15 + rand() * 0.3);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    const tone = rand() < 0.55 ? '#000000' : '#ffffff';
+    g.addColorStop(0, rgba(tone, 0.06 + rand() * 0.09));
+    g.addColorStop(1, rgba(tone, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+  }
+  const chips = def.texture.chips || ['#000000', '#ffffff'];
+  const count = Math.round((w * h) / 28);
+  for (let i = 0; i < count; i++) {
+    ctx.fillStyle = rgba(chips[Math.floor(rand() * chips.length)], 0.08 + rand() * 0.16);
+    ctx.fillRect(x + Math.floor(rand() * w), y + Math.floor(rand() * h), 1 + Math.floor(rand() * 2), 1);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(x, y, w, 1);
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.fillRect(x, y + h - 1, w, 1);
+}
+
+/** Lastryko: wyraźne, nieregularne okruchy o prawdziwej wielkości 5–29 mm (ppm = piksele na metr). */
+function terrazzo(ctx, def, rand, x, y, w, h, ppm) {
+  const chips = def.texture.chips || ['#888888', '#cccccc'];
+  const mm = ppm / 1000;
+  // drobny pył w tle
+  const dust = Math.round((w * h) / 60);
+  for (let i = 0; i < dust; i++) {
+    ctx.fillStyle = rgba(chips[Math.floor(rand() * chips.length)], 0.25 + rand() * 0.3);
+    ctx.fillRect(x + rand() * w, y + rand() * h, 1, 1);
+  }
+  const count = Math.round(((w * h) / (ppm * ppm)) * 2200);
+  for (let i = 0; i < count; i++) {
+    const t = rand();
+    const r = Math.max(0.7, ((5 + 24 * t * t) * mm) / 2);
+    const cx = x + rand() * w;
+    const cy = y + rand() * h;
+    const n = 5 + Math.floor(rand() * 3);
+    const rot = rand() * Math.PI * 2;
+    const squash = 0.55 + rand() * 0.45;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    ctx.fillStyle = shade(chips[Math.floor(rand() * chips.length)], (rand() - 0.5) * 0.14);
+    ctx.beginPath();
+    for (let k = 0; k < n; k++) {
+      const a = ((k + rand() * 0.6) / n) * Math.PI * 2;
+      const rad = r * (0.6 + rand() * 0.4);
+      const px = Math.cos(a) * rad;
+      const py = Math.sin(a) * rad * squash;
+      const qx = cx + px * cos - py * sin;
+      const qy = cy + px * sin + py * cos;
+      if (k === 0) ctx.moveTo(qx, qy);
+      else ctx.lineTo(qx, qy);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/** Motywy płytek patchworkowych: (ctx, środek cx/cy, połowa boku pola r, kolor wzoru, kolor tła). */
+const MOTIFS = {
+  // gwiazdka ośmioramienna z ćwiartkami kółek w narożnikach
+  star(ctx, cx, cy, r, ink, bg) {
+    ctx.fillStyle = ink;
+    ctx.beginPath();
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const rad = r * (k % 2 ? 0.34 : 0.8);
+      if (k === 0) ctx.moveTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+      else ctx.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+    }
+    ctx.closePath();
+    ctx.fill();
+    corners(ctx, cx, cy, r, r * 0.24);
+    dot(ctx, cx, cy, r * 0.13, bg);
+  },
+  // gwiazdka czteroramienna
+  star4(ctx, cx, cy, r, ink, bg) {
+    ctx.fillStyle = ink;
+    ctx.beginPath();
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      const rad = r * (k % 2 ? 0.3 : 0.92);
+      if (k === 0) ctx.moveTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+      else ctx.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+    }
+    ctx.closePath();
+    ctx.fill();
+    corners(ctx, cx, cy, r, r * 0.3);
+    dot(ctx, cx, cy, r * 0.12, bg);
+  },
+  // kwiatek: cztery płatki po przekątnych, romby na środkach boków
+  flower(ctx, cx, cy, r, ink, bg) {
+    ctx.fillStyle = ink;
+    for (let k = 0; k < 4; k++) {
+      const a = Math.PI / 4 + (k * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.ellipse(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, r * 0.46, r * 0.22, a, 0, Math.PI * 2);
+      ctx.fill();
+      const b = (k * Math.PI) / 2;
+      diamond(ctx, cx + Math.cos(b) * r, cy + Math.sin(b) * r, r * 0.22);
+    }
+    dot(ctx, cx, cy, r * 0.2, ink);
+    dot(ctx, cx, cy, r * 0.09, bg);
+  },
+  // romb w rombie
+  diamond(ctx, cx, cy, r, ink, bg) {
+    ctx.fillStyle = ink;
+    diamond(ctx, cx, cy, r * 0.9);
+    ctx.fillStyle = bg;
+    diamond(ctx, cx, cy, r * 0.58);
+    ctx.fillStyle = ink;
+    diamond(ctx, cx, cy, r * 0.26);
+    corners(ctx, cx, cy, r, r * 0.2);
+  },
+  // pierścienie
+  rings(ctx, cx, cy, r, ink) {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = Math.max(1, r * 0.13);
+    for (const q of [0.74, 0.42]) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * q, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    dot(ctx, cx, cy, r * 0.14, ink);
+    ctx.fillStyle = ink;
+    corners(ctx, cx, cy, r, r * 0.26);
+  },
+  // krzyż z kółkiem
+  cross(ctx, cx, cy, r, ink, bg) {
+    ctx.fillStyle = ink;
+    const t = r * 0.2;
+    ctx.fillRect(cx - t / 2, cy - r, t, 2 * r);
+    ctx.fillRect(cx - r, cy - t / 2, 2 * r, t);
+    dot(ctx, cx, cy, r * 0.48, ink);
+    dot(ctx, cx, cy, r * 0.28, bg);
+    dot(ctx, cx, cy, r * 0.1, ink);
+  },
+};
+
+function dot(ctx, cx, cy, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+function diamond(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx + r, cy);
+  ctx.lineTo(cx, cy + r);
+  ctx.lineTo(cx - r, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+/** Kółka w czterech narożnikach pola (bieżącym kolorem wypełnienia) – po przycięciu zostają ćwiartki. */
+function corners(ctx, cx, cy, r, rad) {
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    ctx.beginPath();
+    ctx.arc(cx + sx * r, cy + sy * r, rad, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * Płytka patchworkowa: losowy motyw z def.texture.motifs ('star', 'flower:2' = motyw powtórzony 2 × 2 na płytce),
+ * kolor wzoru z def.texture.inks; część płytek (def.texture.invert, 0…1) ma kolory zamienione.
+ */
+function patchwork(ctx, def, rand, base, x, y, w, h) {
+  const motifs = def.texture.motifs && def.texture.motifs.length ? def.texture.motifs : ['star'];
+  const inks = def.texture.inks && def.texture.inks.length ? def.texture.inks : ['#2a2b2e'];
+  const [name, rep] = motifs[Math.floor(rand() * motifs.length)].split(':');
+  let ink = inks[Math.floor(rand() * inks.length)];
+  let bg = base;
+  if (rand() < (def.texture.invert || 0)) {
+    [ink, bg] = [bg, ink];
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, y, w, h);
+  }
+  const fn = MOTIFS[name] || MOTIFS.star;
+  const k = Math.min(4, Math.max(1, Number(rep) || 1));
+  // pole motywu jest kwadratem; na płytce prostokątnej motywy rozkładają się wzdłuż dłuższego boku
+  const r = Math.min(w, h) / (2 * k);
+  const kx = Math.max(1, Math.round(w / (2 * r)));
+  const ky = Math.max(1, Math.round(h / (2 * r)));
+  for (let j = 0; j < ky; j++) {
+    for (let i = 0; i < kx; i++) {
+      const cx = x + ((i + 0.5) * w) / kx;
+      const cy = y + ((j + 0.5) * h) / ky;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cx - w / (2 * kx), cy - h / (2 * ky), w / kx, h / ky);
+      ctx.clip();
+      fn(ctx, cx, cy, r, ink, bg);
+      ctx.restore();
+    }
+  }
+}
+
 // ---------------------------------------------------------------- rysowanie całej komórki
 
 function drawTiles(ctx, def, params, L, seed, image) {
   ctx.fillStyle = L.groutPx > 0 ? params.groutColor : def.colors[0];
   ctx.fillRect(0, 0, L.pxW, L.pxH);
   const g0 = Math.floor(L.groutPx / 2);
+  const ppm = L.pxW / L.cellW;
+  const rows = rng(seed ^ 0x51ed);
   for (let j = 0; j < L.ny; j++) {
-    const shift = params.pattern === 'brick' && j % 2 ? Math.round(L.ex / 2) : 0;
+    let shift = params.pattern === 'brick' && j % 2 ? Math.round(L.ex / 2) : 0;
+    // deski ścienne: łączenia czołowe w losowych miejscach zamiast równo co pół elementu
+    if (params.pattern === 'brick' && def.texture.stagger === 'random') shift = Math.round((0.15 + rows() * 0.7) * L.ex);
     // i = -1: element przesuniętego rzędu, który "zawija się" przez lewą krawędź komórki
     for (let i = shift ? -1 : 0; i < L.nx; i++) {
       const rand = rng(seed ^ hash(`${(i + L.nx) % L.nx}:${j}`));
-      drawElement(ctx, def, rand, i * L.ex + shift + g0, j * L.ey + g0, L.ex - L.groutPx, L.ey - L.groutPx, image);
+      drawElement(ctx, def, rand, i * L.ex + shift + g0, j * L.ey + g0, L.ex - L.groutPx, L.ey - L.groutPx, image, ppm);
     }
   }
 }
@@ -277,6 +530,22 @@ function drawHerringbone(ctx, def, params, L, seed) {
         if (horizontal) ctx.fillRect(px, py + o, c, 1);
         else ctx.fillRect(px + o, py, 1, c);
       }
+      if (def.texture.tileJoint) {
+        // gres w jodełkę: pełna fuga o zadanej szerokości, rysowana raz na styk (górna / lewa krawędź elementu
+        // i jeden koniec) – sąsiednie elementy domykają pozostałe krawędzie
+        const g = L.groutPx;
+        if (g > 0) {
+          ctx.fillStyle = params.groutColor;
+          if (horizontal) {
+            ctx.fillRect(px, py, c, g);
+            if (d === 0) ctx.fillRect(px, py, g, c);
+          } else {
+            ctx.fillRect(px, py, g, c);
+            if (j === n - 1) ctx.fillRect(px, py, c, g);
+          }
+        }
+        continue;
+      }
       // szczeliny na obwodzie deski
       ctx.fillStyle = rgba(params.groutColor, 0.55);
       if (horizontal) {
@@ -314,12 +583,14 @@ function drawSeamless(ctx, def, L, seed) {
     return;
   }
   // beton / mikrocement: miękkie plamy; każda rysowana także po drugiej stronie krawędzi → brak szwu
+  // tynk strukturalny ('plaster'): plamy słabsze, za to gęste drobne ziarno
+  const plaster = def.texture.look === 'plaster';
   for (let i = 0; i < 70; i++) {
     const cx = rand() * W;
     const cy = rand() * H;
     const r = W * (0.06 + rand() * 0.22);
     const tone = rand() < 0.5 ? '#ffffff' : '#000000';
-    const alpha = 0.035 + rand() * 0.05;
+    const alpha = (0.035 + rand() * 0.05) * (plaster ? 0.5 : 1);
     for (const dx of [-W, 0, W]) {
       for (const dy of [-H, 0, H]) {
         const x = cx + dx;
@@ -333,7 +604,8 @@ function drawSeamless(ctx, def, L, seed) {
       }
     }
   }
-  for (let i = 0; i < 900; i++) {
+  const grains = plaster ? Math.round((W * H) / 14) : 900;
+  for (let i = 0; i < grains; i++) {
     ctx.fillStyle = rand() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
     ctx.fillRect(Math.floor(rand() * W), Math.floor(rand() * H), 1, 1);
   }

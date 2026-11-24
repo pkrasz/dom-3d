@@ -386,6 +386,36 @@ describe('meble – edycja z panelu', () => {
     expect(swatch.classList.contains('is-active')).toBe(false);
   });
 
+  it('mebel dwukolorowy: przełącznik „Fronty / Blat” kieruje paletę na drugi kolor', () => {
+    expect(panel().querySelector('.meb-slots').hidden).toBe(true); // sofa ma jeden kolor
+    expect(meble.setColor('#112233', 2)).toBe(false);
+    const sofaColor = item(id).color;
+    const wyspa = meble.add('wyspa-barek');
+    expect(item(wyspa)).toMatchObject({ color: '#ddd2bf', color2: '#b5895a' });
+    const slots = panel().querySelector('.meb-slots');
+    expect(slots.hidden).toBe(false);
+    const [first, second] = slots.querySelectorAll('.meb-slot');
+    expect(first.textContent).toBe('Fronty');
+    expect(second.textContent).toBe('Blat i boki');
+    expect(first.classList.contains('is-active')).toBe(true);
+    expect(panel().querySelector('.meb-swatch[data-color="#ddd2bf"]').classList.contains('is-active')).toBe(true);
+    second.click();
+    expect(second.getAttribute('aria-pressed')).toBe('true');
+    expect(panel().querySelector('.meb-swatch[data-color="#b5895a"]').classList.contains('is-active')).toBe(true);
+    panel().querySelector('.meb-swatch[data-color="#5b3f2a"]').click();
+    expect(item(wyspa)).toMatchObject({ color: '#ddd2bf', color2: '#5b3f2a' });
+    const colorsInScene = () => new Set(meble.scene.get(wyspa).children.filter((m) => m.userData.mebPart).map((m) => m.material.color.getHexString()));
+    expect(colorsInScene().has('5b3f2a')).toBe(true); // bryła przebudowana z nowym blatem
+    first.click();
+    panel().querySelector('.meb-swatch[data-color="#7d8f7a"]').click();
+    expect(item(wyspa)).toMatchObject({ color: '#7d8f7a', color2: '#5b3f2a' });
+    meble.remove(wyspa);
+    meble.select(id);
+    expect(panel().querySelector('.meb-slots').hidden).toBe(true);
+    expect(item(id).color).toBe(sofaColor);
+    expect(items()).toHaveLength(1);
+  });
+
   it('duplikowanie tworzy kopię obok i zaznacza ją; usuwanie usuwa zaznaczony', () => {
     click('Duplikuj');
     expect(items()).toHaveLength(2);

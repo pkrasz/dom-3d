@@ -1,6 +1,6 @@
 // Synchronizacja WARIANT → SCENA: obiekty mebli w app.furnitureGroup(levelId) zawsze odpowiadają variant.furniture.
 // Różnicowo po id: nowy mebel = nowa grupa, usunięty = usunięta, zmieniony = poprawiona (bryła budowana od nowa
-// tylko wtedy, gdy zmienił się typ, wymiar albo kolor; samo przesunięcie / obrót zmienia tylko transformację).
+// tylko wtedy, gdy zmienił się typ, wymiar albo któryś kolor; samo przesunięcie / obrót zmienia tylko transformację).
 import { createModelFactory } from './model.js';
 
 const RAD = Math.PI / 180;
@@ -85,7 +85,7 @@ export function createFurnitureScene(app) {
   });
 
   // ---------------------------------------------------------------- obiekty
-  const shapeKeyOf = (item) => `${item.type}|${item.w}|${item.d}|${item.h}|${item.color}`;
+  const shapeKeyOf = (item) => `${item.type}|${item.w}|${item.d}|${item.h}|${item.color}|${item.color2 || ''}`;
 
   function groupFor(levelId) {
     try {

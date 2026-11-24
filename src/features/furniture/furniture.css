@@ -127,6 +127,47 @@
   color: #b3261e;
 }
 
+/* przełącznik „który kolor” – tylko meble dwukolorowe (np. fronty + blat) */
+.meb-slots {
+  display: flex;
+  gap: 8px;
+}
+
+.meb-slots[hidden] {
+  display: none;
+}
+
+.meb-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--hit);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.meb-slot.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.meb-slot__dot {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+}
+
+.meb-slot__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* próbka koloru: cel dotykowy 44 px, widoczne kółko 30 px */
 .meb-swatch {
   flex: 0 0 var(--hit);

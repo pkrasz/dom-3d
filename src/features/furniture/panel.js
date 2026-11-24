@@ -1,7 +1,7 @@
 // Zawartość paneli funkcji "Meble": katalog (dodawanie) i edycja zaznaczonego mebla.
 // Tylko DOM – żadnej logiki ustawiania; wszystko, co użytkownik zrobi, idzie do funkcji z `handlers`.
 import { el } from '../../ui/dom.js';
-import { CATEGORIES, CATALOG, PALETTE, MOUNT_RANGE } from './catalog.js';
+import { CATEGORIES, CATALOG, PALETTE, MOUNT_RANGE, secondColorOf } from './catalog.js';
 
 const svg = (body) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
@@ -56,7 +56,7 @@ export function createCatalogContent({ onAdd }) {
 
 /**
  * @param {{onRotate: (deg: number) => void, onFaceWall: () => void, onDuplicate: () => void, onMoveHere: () => void,
- *          onDelete: () => void, onColor: (hex: string) => void, onSize: (size: {w?: number, d?: number, h?: number}) => void,
+ *          onDelete: () => void, onColor: (hex: string, slot: 1|2) => void, onSize: (size: {w?: number, d?: number, h?: number}) => void,
  *          onMount: (z: number) => void}} handlers   wymiary i wysokość zawieszenia w METRACH
  * @returns {{element: HTMLElement, update: (item: Object, type: Object) => void}}
  */
@@ -79,15 +79,44 @@ export function createEditContent(handlers) {
   actions.children[3].title = 'Obróć tyłem do najbliższej ściany i dosuń';
   actions.children[5].title = 'Przenieś mebel na środek oglądanego widoku (także do innego pomieszczenia; na inną kondygnację – najpierw ją przełącz)';
 
-  // --- kolor: paleta + próbnik
+  // --- kolor: paleta + próbnik; typy dwukolorowe (np. fronty + blat) mają nad paletą przełącznik, który kolor się zmienia
+  let slot = 1;
+  let current = null; // { item, type } ostatnio pokazanego mebla
   const swatches = PALETTE.map((hex) =>
-    el('button', { class: 'meb-swatch', type: 'button', title: hex, 'aria-label': `Kolor ${hex}`, dataset: { color: hex }, onclick: () => handlers.onColor(hex) }, [
+    el('button', { class: 'meb-swatch', type: 'button', title: hex, 'aria-label': `Kolor ${hex}`, dataset: { color: hex }, onclick: () => handlers.onColor(hex, slot) }, [
       el('span', { style: `background:${hex}` }),
     ])
   );
   const picker = el('input', { class: 'meb-picker', type: 'color', 'aria-label': 'Dowolny kolor (próbnik)', title: 'Dowolny kolor' });
-  picker.addEventListener('change', () => handlers.onColor(picker.value));
+  picker.addEventListener('change', () => handlers.onColor(picker.value, slot));
   const colors = el('div', { class: 'meb-colors', role: 'group', 'aria-label': 'Kolor mebla' }, [...swatches, picker]);
+  const slotButtons = [1, 2].map((n) =>
+    el('button', { class: 'btn meb-slot', type: 'button', dataset: { slot: String(n) }, onclick: () => {
+      slot = n;
+      showColors();
+    } }, [el('span', { class: 'meb-slot__dot', 'aria-hidden': 'true' }), el('span', { class: 'meb-slot__name' })])
+  );
+  const slots = el('div', { class: 'meb-slots', role: 'group', 'aria-label': 'Który kolor zmienić' }, slotButtons);
+  slots.hidden = true;
+
+  /** Zaznacza w palecie kolor aktywnego slotu i opisuje przyciski slotów. */
+  function showColors() {
+    if (!current) return;
+    const { item, type } = current;
+    const two = Boolean(type.color2);
+    if (!two) slot = 1;
+    slots.hidden = !two;
+    const values = [String(item.color || '').toLowerCase(), String(secondColorOf(item, type) || '').toLowerCase()];
+    slotButtons.forEach((btn, i) => {
+      btn.classList.toggle('is-active', slot === i + 1);
+      btn.setAttribute('aria-pressed', String(slot === i + 1));
+      btn.children[0].style.background = values[i] || 'transparent';
+      btn.children[1].textContent = type.colorNames?.[i] || (i ? 'Kolor 2' : 'Kolor 1');
+    });
+    const color = values[slot - 1];
+    for (const s of swatches) s.classList.toggle('is-active', s.dataset.color === color);
+    if (/^#[0-9a-f]{6}$/.test(color)) picker.value = color;
+  }
 
   // --- wymiary w cm
   const fields = {};
@@ -114,7 +143,7 @@ export function createEditContent(handlers) {
     field('z', 'Od podłogi', (v) => handlers.onMount(v)),
   ]);
 
-  const element = el('div', { class: 'meb-edit' }, [actions, colors, dims]);
+  const element = el('div', { class: 'meb-edit' }, [actions, slots, colors, dims]);
 
   function setField(key, meters, range) {
     const f = fields[key];
@@ -133,9 +162,9 @@ export function createEditContent(handlers) {
       const mounted = Number.isFinite(item.z) || type.mount !== undefined;
       fields.z.wrap.hidden = !mounted;
       if (mounted) setField('z', item.z || 0, MOUNT_RANGE);
-      const color = String(item.color || '').toLowerCase();
-      for (const s of swatches) s.classList.toggle('is-active', s.dataset.color === color);
-      if (/^#[0-9a-f]{6}$/.test(color)) picker.value = color;
+      if (current && current.item.id !== item.id) slot = 1; // inny mebel – zaczynamy od koloru głównego
+      current = { item, type };
+      showColors();
     },
   };
 }

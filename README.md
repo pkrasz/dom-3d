@@ -7,7 +7,8 @@ Co potrafi:
 - pokazuje dom zbudowany wyłącznie z wymiarów w `house.json` – w rzucie z góry, w orbicie i w spacerze na wysokości oczu,
 - pozwala nadać każdej ścianie, podłodze, sufitowi, skosowi i kominowi farbę albo materiał (płytki, deski, jodełka, beton, wykładzina, własne zdjęcie płytki), także „płytki do wysokości”,
 - pozwala ustawiać meble z katalogu (kolizje ze ścianami, dosuwanie do ścian, wymiary, kolor),
-- trzyma kilka wariantów aranżacji, zapisuje je sam w przeglądarce, eksportuje i importuje jako plik JSON.
+- trzyma kilka wariantów aranżacji, zapisuje je sam w przeglądarce, eksportuje i importuje jako plik JSON,
+- ma gotowe aranżacje całego domu (na razie „Montana”), które dodaje się jednym przyciskiem jako nowy wariant.
 
 ## Uruchomienie
 
@@ -71,9 +72,11 @@ Dla ścian, kominów i skosów jest przełącznik „Cała ściana / Płytki do 
 
 ### Warianty, eksport, import
 
-Przycisk z nazwą wariantu otwiera panel „Warianty”: lista (przełączanie, zmiana nazwy, usuwanie – ostatniego nie da się usunąć), „Pusty z meblami z projektu”, „Kopia bieżącego”, „Udostępnij”, „Wyślij plik”, „Wklej link…”, „Eksportuj bieżący”, „Eksportuj wszystkie”, „Importuj z pliku…”.
+Przycisk z nazwą wariantu otwiera panel „Warianty”: lista (przełączanie, zmiana nazwy, usuwanie – ostatniego nie da się usunąć), „Pusty z meblami z projektu”, „Kopia bieżącego”, „Gotowe aranżacje”, „Udostępnij”, „Wyślij plik”, „Wklej link…”, „Eksportuj bieżący”, „Eksportuj wszystkie”, „Importuj z pliku…”.
 
 Zmiany zapisują się same w `localStorage` tej przeglądarki (klucz `model3d-dom`). Plik eksportu (`dom-<nazwa>-RRRR-MM-DD.json`) służy jako kopia zapasowa. Import jednego wariantu od razu go aktywuje; paczka wariantów tylko dopisuje się do listy.
+
+**Gotowe aranżacje.** W sekcji „Nowy wariant” jest grupa „Gotowe aranżacje” – przycisk (np. „Montana”) dodaje przygotowaną aranżację całego domu jako **nowy** wariant i od razu na niego przełącza. Niczego nie nadpisuje: gdy wariant o tej nazwie już jest, nowy dostaje dopisek „(2)”. Po dodaniu to zwykły wariant – można go zmieniać, kopiować, udostępniać i usunąć. Pierwsze uruchomienie w nowej przeglądarce nadal zaczyna od „Wariant 1” z samymi meblami z projektu.
 
 **Wysyłanie wariantu na inny telefon.** „Udostępnij” tworzy link z całym aktywnym wariantem (wykończenia i meble) i otwiera systemowe udostępnianie (albo kopiuje link do schowka). Odbiorca otwiera link, widzi pytanie „Dodać wariant «nazwa»?” i po „Dodaj i otwórz” ma go u siebie jako nowy wariant – jego własne warianty zostają bez zmian. To kopia: późniejsze zmiany trzeba wysłać ponownie, a ten sam link otwarty drugi raz doda kolejną kopię z dopiskiem „(2)”. Każdy, kto ma link, zobaczy ten wariant. Wariant z własnymi zdjęciami płytek (albo wyjątkowo duży) nie mieści się w linku – wtedy „Wyślij plik” i u odbiorcy „Importuj z pliku…”.
 
@@ -110,7 +113,9 @@ Wartości `texture.draw`:
 - `'herringbone'` – jodełka; `size` = [szerokość, długość], długość musi być wielokrotnością szerokości,
 - `'seamless'` – bez podziału (beton, wykładzina); `size` to okres powtarzania wzoru.
 
-Wartości `texture.look`: `'plain'`, `'clouds'` (przetarcia betonu), `'veins'` (żyłki marmuru), `'speckle'` (lastryko, granit – kolory ziaren w `texture.chips: ['#...', ...]`), `'wood'` (słoje), `'slate'` (warstwy łupka), `'carpet'` (włókno – używane z `'seamless'`).
+Wartości `texture.look`: `'plain'`, `'clouds'` (przetarcia betonu), `'veins'` (żyłki marmuru), `'speckle'` (lastryko, granit – kolory ziaren w `texture.chips: ['#...', ...]`), `'wood'` (słoje), `'slate'` (warstwy łupka), `'carpet'` (włókno – używane z `'seamless'`), `'patchwork'` (płytka z motywem – gwiazdki, kwiatki), `'brick'` (cegła o nierównych odcieniach), `'oldwood'` (postarzane deski z sękami), `'terrazzo'` (lastryko z okruchami w prawdziwej skali – kolory w `texture.chips`), `'plaster'` (tynk strukturalny – używany z `'seamless'`).
+
+Jodełka z gresu (zamiast drewnianej) ma flagę `texture.tileJoint: true` – rysuje pełną fugę, a panel pokazuje dla niej wybór szerokości i koloru fugi. Listy formatów w `FORMATS` to m.in. `'tile'`, `'plank'`, `'herringbone'`, `'herringboneTile'`, `'board'`, `'brick'`; kategoria „Cegła i tynk” ma id `cegla`.
 
 Krócej – tymi samymi pomocnikami, których używa plik (`wood`, `herringbone`, `laminate`, `tile`, `seamless`):
 
@@ -205,6 +210,8 @@ Zasady pilnowane przez test (`tests/furniture.test.js`, „meble – katalog”)
 
 Wymiary pisz względem `w`, `d`, `h` (jak w przykładzie), wtedy mebel poprawnie się skaluje. Nowa kategoria = wpis w `CATEGORIES` (z co najmniej jednym meblem). Paleta kolorów w panelu edycji to `PALETTE`. Po zmianie: `npm test`.
 
+**Meble dwukolorowe i dodatkowe kształty.** Typ może mieć drugi kolor: pola `color2: '#rrggbb'` (domyślny) i `colorNames: ['Fronty', 'Blat']` (podpisy przełącznika w panelu edycji); w bryle używa się wtedy materiałów `'second'`, `'second-dark'`, `'second-light'`. W wariancie drugi kolor to opcjonalne pole mebla `color2` (brak = domyślny typu). Poza `b.box` i `b.cyl` są kształty: `ell` (walec eliptyczny), `tube` (rura / misa), `cylX`, `cylY`, `discY` (walce leżące), `ball` (elipsoida), `beam` (belka skośna między dwoma punktami) – sygnatury i lista `SHAPES` są w nagłówku `catalog.js`.
+
 Mebla zapisanego w wariancie z nieznanym `type` aplikacja nie gubi – rysuje go jako zwykłą skrzynię (`FALLBACK_TYPE`). Dlatego nie zmieniaj `id` typów, które są już użyte w wariantach.
 
 ### Meble startowe
@@ -221,15 +228,49 @@ Plik: `src/features/furniture/starter.js`, tablica `FROM_PROJECT`. Są tam tylko
 
 Meble startowe trafiają tylko do **nowo tworzonego** wariantu (pierwsze uruchomienie albo „Pusty z meblami z projektu”). Warianty już zapisane w przeglądarce się nie zmieniają. Położenie tych mebli sprawdzają testy „meble – startowe z projektu” w `tests/furniture.test.js` (część liczb jest tam wpisana wprost) – zmieniając lub usuwając wpis, popraw też test.
 
+## Gotowe aranżacje – jak dodać kolejną
+
+Katalog: `src/features/variants/presets/`. Gotowa aranżacja to zwykły wariant (ten sam kształt co w pliku eksportu) zapisany w kodzie.
+
+1. Dane: moduł z funkcją zwracającą **nowy** obiekt `{ id, name, finishes, furniture, customMaterials: [] }`. „Montana” to `presets/montana.js`, który składa dwa moduły danych: `presets/montana/parter.js` i `presets/montana/poddasze.js` (każdy eksportuje `finishes` i `furniture` swojej kondygnacji). Najprościej zacząć od wariantu ułożonego w aplikacji: „Eksportuj bieżący” i przepisać `finishes` / `furniture` z pliku.
+2. Rejestr: jeden wpis w `presets/index.js` → `PRESETS`:
+
+```js
+{ id: 'skandynawska', name: 'Skandynawska', description: 'Jedno zdanie pod przyciskiem.', create: createSkandynawska },
+```
+
+Przycisk w panelu pojawia się sam. Zasady:
+
+- meble z projektu (`starter.js`) zostają w aranżacji z tymi samymi `id`, położeniem i wymiarami – zmienia się najwyżej kolor,
+- bez własnych zdjęć płytek (`customMaterials` puste) – inaczej wariant nie zmieści się w linku,
+- `id` materiałów z `library.js`, typy mebli z `catalog.js`, identyfikatory powierzchni z bryły **z `design.json`**.
+
+`tests/presets.test.js` sprawdza każdą aranżację z rejestru: unikalne `id` mebli, typy i zakresy wymiarów z katalogu, brak kolizji ze ścianami, kominami i schodami, wysokość pod sufitem i skosem, istniejące powierzchnie i materiały pasujące do rodzaju powierzchni, walidację importu bez strat, plik i link tam i z powrotem, a na końcu dodanie z panelu w złożonej aplikacji (wszystkie meble w scenie, wszystkie wykończenia nałożone, bez błędów w konsoli). Wymagania konkretnej aranżacji (łuki drzwi, przejścia 80 cm, nakładanie mebli) mają własne testy: `tests/preset.montana.parter.test.js`, `tests/preset.montana.poddasze.test.js`.
+
+Rozmiar: „Montana” (139 wykończeń, 119 mebli) daje link o długości ok. 4700 znaków przy limicie 6000. Test wymaga co najmniej 500 znaków zapasu – gdy aranżacja urośnie ponad to, trzeba odchudzić dane (mniej drobnych mebli, mniej różnych kolorów ścian), a nie podnosić limit.
+
 ## Skąd się bierze geometria
 
-Jedynym źródłem geometrii jest `house.json`. Kod w `src/geometry/` buduje z niego ściany, otwory, stropy, schody, skosy i dach; nic nie jest „dorysowane” w kodzie. Wykończenia i meble nigdy nie zmieniają tego pliku (pole `meta.rule`).
+Źródłem geometrii jest `house.json` (projekt) oraz – tylko dla jawnie wpisanych odstępstw – `design.json` (opcje bryły, niżej). Kod w `src/geometry/` buduje z nich ściany, otwory, stropy, schody, skosy i dach; nic nie jest „dorysowane” w kodzie. Wykończenia i meble nigdy nie zmieniają tego pliku (pole `meta.rule`).
 
 Układ współrzędnych (pole `meta.coordinates`): metry; początek (0,0) w lewym-dolnym zewnętrznym narożniku **muru** na rzucie parteru; `x` w prawo arkusza (0..13,60), `y` w górę arkusza (0..10,10), `z` w górę od posadzki parteru ±0,00. Wymiar 14,00 × 10,50 z projektu to obrys z ociepleniem. Wymiary są surowe, bez tynków (`meta.dimensionsAre`). Three.js ma oś Y w górę – przeliczenie jest w `src/app/coords.js` (`toWorld`, `toHouse`).
 
 Główne części pliku: `meta`, `construction`, `levels` (parter i poddasze: `walls`, `openings`, `rooms`, `chimneys`, schody itd.), `roof`, `assumptions`.
 
 **Zasada: nie zgaduj wymiarów.** Każda liczba ma pochodzić z projektu. Pewność odczytu opisuje `meta.confidenceLegend`: `pewne` (liczba wpisana na rysunku), `wyliczone` (z łańcucha wymiarów), `pomiar` (zmierzone ze skali rysunku, ok. 1 cm), `zalozenie` (nie ma w projekcie – przyjęte, do zmiany). Wszystko, czego projekt nie podaje, jest spisane w tablicy `assumptions` – 22 wpisy `A1`–`A22`, każdy z polami `id`, `text`, `affects` (np. wysokość balustrad, kształt szpaletów okien dachowych, uproszczenie dachu). Przyjmując nowe założenie, dopisz je tam. Dodatkowe reguły budowania są w `meta.buildRules`.
+
+### Opcje bryły – `design.json`
+
+`house.json` zostaje wierny projektowi. Decyzje aranżacyjne właściciela, które zmieniają **bryłę**, są w osobnym pliku `design.json` i wszystkie są **założeniami do uzgodnienia z projektantem / konstruktorem** (każda ma pole `note`). Usunięcie opcji z pliku przywraca bryłę z projektu; pusty obiekt `{}` to dokładnie projekt. `src/main.js` przekazuje plik do `createApp({ house, design, … })`; w kodzie jest dostępny jako `app.design`.
+
+| Opcja | Co zmienia |
+|---|---|
+| `stairs.groundFloorBalustrade: "slats"` + `stairs.slats` (`profile`, `clearGap`, `color`) | zamiast balustrady biegu dolnego czarne pionowe lamele od stopnic do spodu stropu |
+| `stairs.treads` (`tread`, `riser`, `thickness`, `nosing`) | dębowe stopnice na jasnych podstopnicach; rzędne schodów bez zmian |
+| `openCeiling.rooms` (np. `["1/9", "1/10", "1/11"]`) | pomieszczenia bez sufitu płaskiego – skos do kalenicy, ściany do skosu |
+| `openCeiling.beams` (`color`, `enabled`, `collarTies`, `purlins`) | widoczne jętki i płatew w pomieszczeniach otwartych (przekroje i rozstaw przyjęte, nie z projektu więźby) |
+
+Skutki dla wariantów: w pomieszczeniach otwartych nie ma powierzchni `…:ceiling`, a sypialnia 1/9 dostaje skosy `poddasze:1/9:slope-N` i `slope-S`. Wykończenia zapisane dla powierzchni, których w bieżącej bryle nie ma, są po prostu niewidoczne (własny zapis) albo pomijane z komunikatem (import, link, gotowa aranżacja). Wysokość pomieszczenia w punkcie – także pod skosem otwartego sufitu – zwraca `app.collision.ceilingAt(levelId, x, y)`. Lamele i belki są stałymi elementami bryły (nie da się ich zaznaczyć ani przemalować w aplikacji – kolor ustawia `design.json`). Zmianę opcji sprawdza `tests/geometry.design.test.js`.
 
 Narzędzia (uruchamiane w Node, czytają tylko `house.json`):
 
@@ -249,7 +290,8 @@ Uwaga: zmiana geometrii może zmienić identyfikatory powierzchni (np. numer śc
 ## Struktura katalogów
 
 ```
-house.json            geometria domu – jedyne źródło wymiarów
+house.json            geometria domu z projektu – źródło wymiarów
+design.json           opcje bryły: jawne odstępstwa od projektu (lamele przy schodach, otwarty sufit z belkami)
 index.html            strona startowa
 vite.config.js        konfiguracja Vite i testów
 src/
@@ -263,7 +305,8 @@ src/
   features/
     finishes/         wykończenia: library.js, palette.js (dane), textures.js, finish.js, apply.js, panel.js…
     furniture/        meble: catalog.js, starter.js (dane), placement.js, model.js, scene.js, panel.js
-    variants/         warianty: controller.js, storage.js, validate.js, io.js, panel.js, share.js (link), receive.js
+    variants/         warianty: controller.js, storage.js, validate.js, io.js, panel.js, share.js (link), receive.js,
+                      presets/ (gotowe aranżacje: index.js = rejestr, montana.js + montana/parter.js, poddasze.js)
 tools/                check.mjs, preview2d.mjs, geometry.mjs
 tests/                testy vitest
 preview/              wygenerowane podglądy 2D i podkłady z rysunków
@@ -326,7 +369,7 @@ Plik eksportu:
   - `{ kind: 'material', id, rot, size?, pattern?, grout?, groutWidth? }` – `id` z biblioteki albo z `customMaterials`; `rot` 0 lub 90; opcjonalnie `size` [szer., wys.] w m, `pattern` `'straight'` / `'brick'`, `grout` kolor fugi, `groutWidth` szerokość fugi w m,
   - `{ kind: 'split', height, lower, upper }` – tylko ściany, kominy i skosy: do `height` (m od podłogi) wykończenie `lower`, wyżej `upper`; bez zagnieżdżania.
   - Powierzchnia bez wpisu ma wygląd domyślny.
-- `furniture` – `type` z katalogu, `levelId`, środek `x`, `y` w układzie domu (m), `rot` w stopniach (przeciwnie do wskazówek zegara; przy 0 tył mebla patrzy w +y), `w`, `d`, `h` w m, `color`, opcjonalnie `z` (wysokość spodu nad posadzką – meble wiszące).
+- `furniture` – `type` z katalogu, `levelId`, środek `x`, `y` w układzie domu (m), `rot` w stopniach (przeciwnie do wskazówek zegara; przy 0 tył mebla patrzy w +y), `w`, `d`, `h` w m, `color`, opcjonalnie `z` (wysokość spodu nad posadzką – meble wiszące) i `color2` (drugi kolor mebli dwukolorowych, np. blat).
 - `customMaterials` – własne płytki: zdjęcie jako `dataUrl` (obraz rastrowy w base64) i wymiar elementu `size` w m.
 
 Przy imporcie dane są czyszczone (`validate.js`): wykończenia powierzchni, których nie ma w tym domu, i meble z nieznanych kondygnacji są pomijane; limity to m.in. 30 wariantów, 500 mebli i 60 własnych materiałów na wariant. W `localStorage` zapis ma postać `{ version, activeId, savedAt, variants }`. Zmiana formatu wymaga podniesienia `CURRENT_VERSION` i wpisu w `MIGRATIONS` w `validate.js`.

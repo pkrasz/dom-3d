@@ -3,7 +3,6 @@
 // Kolizje 2D ze ścianami (src/geometry/collision.js); na schodach wysokość oczu podąża za stopniami.
 import { PerspectiveCamera } from 'three';
 import { moveCircle } from '../geometry/collision.js';
-import { ceilingAt } from '../geometry/levelModel.js';
 import { EYE_HEIGHT, WALK_RADIUS, WALK_HEAD_CLEARANCE } from '../geometry/constants.js';
 import { toWorld } from '../app/coords.js';
 
@@ -33,11 +32,11 @@ export function createWalkControls({ dom, house, collision, requestRender, onLev
   let lastX = 0;
   let lastY = 0;
 
-  /** Wysokość oczu nad stopami: pod skosem poddasza kamera się obniża. */
-  function eyeHeightAt(y, feetZ) {
+  /** Wysokość oczu nad stopami: pod skosem poddasza kamera się obniża (także pod skosem sufitu otwartego do kalenicy). */
+  function eyeHeightAt(x, y, feetZ) {
     const level = house.levels.find((l) => Math.abs(l.floorLevel - feetZ) < 0.01);
     if (!level || !level.ceiling) return EYE_HEIGHT;
-    return Math.max(0.9, Math.min(EYE_HEIGHT, ceilingAt(level, y) - WALK_HEAD_CLEARANCE));
+    return Math.max(0.9, Math.min(EYE_HEIGHT, collision.ceilingAt(level.id, x, y) - WALK_HEAD_CLEARANCE));
   }
 
   function syncCamera() {
@@ -92,7 +91,7 @@ export function createWalkControls({ dom, house, collision, requestRender, onLev
       active = true;
     }
     // wysokość oczu dochodzi płynnie (stopnie, skosy)
-    const eyeTarget = state.feetZ + eyeHeightAt(state.y, state.feetZ);
+    const eyeTarget = state.feetZ + eyeHeightAt(state.x, state.y, state.feetZ);
     const diff = eyeTarget - state.eyeZ;
     if (Math.abs(diff) > 0.002) {
       state.eyeZ += diff * Math.min(1, dt * 12);
@@ -188,7 +187,7 @@ export function createWalkControls({ dom, house, collision, requestRender, onLev
       state.x = x;
       state.y = y;
       state.feetZ = z;
-      state.eyeZ = z + eyeHeightAt(y, z);
+      state.eyeZ = z + eyeHeightAt(x, y, z);
       if (headingDeg !== undefined) state.heading = (headingDeg * Math.PI) / 180;
       state.pitch = 0;
       syncCamera();

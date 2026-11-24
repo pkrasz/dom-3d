@@ -2,6 +2,10 @@
 // Każda powierzchnia edytowalna dostaje WŁASNY materiał (createSurfaceMaterial),
 // elementy stałe (elewacja, dach, stolarka…) współdzielą materiały z createStaticMaterials.
 import { MeshLambertMaterial, MeshBasicMaterial, DoubleSide } from 'three';
+import { DESIGN_COLORS } from '../geometry/design.js';
+
+/** O ile ciemniejsza jest co druga stopnica drewniana (czytelność podziału w rzucie). */
+const TREAD_ALT_TONE = 0.93;
 
 /** Kolory domyślne powierzchni wnętrz wg rodzaju (userData.kind). */
 export const SURFACE_COLORS = {
@@ -28,6 +32,12 @@ export const STATIC_COLORS = {
   stairs: '#cdbfa8', // schody
   stairsAlt: '#c2b39a', // co drugi stopień (czytelność w rzucie)
   balustrade: '#3b3f45',
+  // --- opcje bryły z design.json (kolory domyślne w geometry/design.js; siatki powstają tylko przy włączonej opcji)
+  slat: DESIGN_COLORS.slat, // lamele przy schodach
+  stairTread: DESIGN_COLORS.stairTread, // stopnice drewniane
+  stairTreadAlt: DESIGN_COLORS.stairTread, // co druga stopnica – ton ciemniejsza (liczona z koloru stopnicy)
+  stairRiser: DESIGN_COLORS.stairRiser, // podstopnice i boki schodów
+  beam: DESIGN_COLORS.beam, // belki pod otwartym sufitem
   terrain: '#9aa88f',
   paving: '#b9b7b0',
   chimney: '#d9d6cf',
@@ -42,12 +52,14 @@ export function createSurfaceMaterial(kind) {
   return m;
 }
 
-export function createStaticMaterials() {
+/** @param {Object<string, string>} [overrides] kolory z design.json (klucze jak w STATIC_COLORS) */
+export function createStaticMaterials(overrides = {}) {
   const out = {};
-  for (const [key, color] of Object.entries(STATIC_COLORS)) {
+  for (const [key, color] of Object.entries({ ...STATIC_COLORS, ...overrides })) {
     out[key] = key === 'sectionCap' ? new MeshBasicMaterial({ color }) : new MeshLambertMaterial({ color });
     out[key].name = key;
   }
+  out.stairTreadAlt.color.copy(out.stairTread.color).multiplyScalar(TREAD_ALT_TONE);
   // teren odsunięty w buforze głębi – krawędź podjazdu leżąca na poziomie terenu nie migocze
   out.terrain.polygonOffset = true;
   out.terrain.polygonOffsetFactor = 1;

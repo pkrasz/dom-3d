@@ -35,6 +35,21 @@
 /**
  * @typedef {Object} App
  * @property {Object} house            zawartość house.json (tylko do odczytu!)
+ * @property {Object} design           zawartość design.json (tylko do odczytu!): OPCJE BRYŁY – decyzje aranżacyjne właściciela,
+ *           które zmieniają bryłę względem projektu (house.json zostaje wierny projektowi). Pusty obiekt = dokładnie projekt.
+ *           Każda opcja ma pole `note` (założenie do uzgodnienia z projektantem / konstruktorem). Dziś:
+ *             design.stairs.groundFloorBalustrade = 'slats' – zamiast balustrady biegu dolnego czarne pionowe lamele
+ *               od stopnic do spodu stropu (design.stairs.slats: profile, clearGap, color); siatka stała 'parter:stairs:slat';
+ *               balustrady przy otworze klatki na poddaszu zostają, kolizje w rzucie bez zmian;
+ *             design.stairs.treads = { tread, riser } – stopnice drewniane i jasne podstopnice (siatki stałe
+ *               'parter:stairs:stairTread' / 'stairTreadAlt' / 'stairRiser' zamiast 'stairs' / 'stairsAlt');
+ *             design.openCeiling.rooms = ['1/9', …] – w tych pomieszczeniach poddasza nie ma sufitu płaskiego:
+ *               NIE MA powierzchni '…:ceiling', a skosy '…:slope-S' / '…:slope-N' biegną do kalenicy (pomieszczenie
+ *               sięgające za kalenicę ma oba); ściany sięgają do skosu; pod sufitem są stałe belki
+ *               (design.openCeiling.beams: jętki i płatwie, siatka 'poddasze:ceiling:beam').
+ *               W domku dla lalek i w rzucie część ścian ponad dawnym sufitem (2,55 m) i belki znikają razem z sufitami
+ *               (mesh.userData.headerStart – ten sam mechanizm co pasy podciągów).
+ *           Lista powierzchni (app.surfaces) zależy więc od design – wykończenia zapisuj tylko dla istniejących surfaceId.
  * @property {{getState: () => import('./store.js').AppState, setState: Function, subscribe: Function}} store
  *           pola stanu: levelId ('parter' | 'poddasze' | 'all'), viewMode ('top' | 'orbit' | 'walk'), showRoof, lighting, selection, activeTool, variant
  * @property {typeof import('three')} three     przestrzeń nazw THREE (ta sama instancja co w rdzeniu)
@@ -101,8 +116,11 @@
  *           tapnięcie, chyba że onEnd zwróci true.
  * @property {{walls: (levelId: string) => Array<{rect: number[], kind: string, id: string}>,
  *             pointInRoom: (levelId: string, x: number, y: number) => ?string,
- *             roomPolygon: (levelId: string, roomId: string) => ?number[][]}} collision
- *           walls: prostokąty [x0, y0, x1, y1] blokujące ruch (mury bez świateł drzwi, kominy, balustrady)
+ *             roomPolygon: (levelId: string, roomId: string) => ?number[][],
+ *             ceilingAt: (levelId: string, x: number, y: number) => ?number}} collision
+ *           walls: prostokąty [x0, y0, x1, y1] blokujące ruch (mury bez świateł drzwi, kominy, balustrady / lamele)
+ *           ceilingAt: wysokość pomieszczenia nad posadzką w punkcie (sufit płaski, skos albo – w pomieszczeniu
+ *             z design.openCeiling – okładzina skosu do kalenicy); przydatne do sprawdzania, czy mebel mieści się pod skosem
  * @property {{get: () => import('./variant.js').Variant, update: (mutator: (draft: Object) => void) => void, set: (v: Object) => void}} variant
  *           update(mutator) pracuje na kopii i emituje 'variant:change'. Mutator zmienia draft w miejscu; może też zwrócić
  *           NOWY wariant (obiekt z polami finishes i furniture) – każda inna zwrócona wartość jest ignorowana
@@ -133,10 +151,11 @@ import { createUI } from '../ui/index.js';
 const INITIAL_STATE = { levelId: 'parter', viewMode: 'orbit', showRoof: false, lighting: 'day', selection: null, activeTool: null };
 
 /**
- * @param {{house: Object, container: HTMLElement, canvas: HTMLCanvasElement, uiRoot: HTMLElement}} options
+ * @param {{house: Object, design?: Object, container: HTMLElement, canvas: HTMLCanvasElement, uiRoot: HTMLElement}} options
+ *        design – opcje bryły z design.json; pominięte = bryła dokładnie z projektu
  * @returns {App & {start: () => void}}
  */
-export function createApp({ house, container, canvas, uiRoot }) {
+export function createApp({ house, design = {}, container, canvas, uiRoot }) {
   const firstLevel = house.levels[0].id;
   let lastConcreteLevel = firstLevel;
 
@@ -152,9 +171,9 @@ export function createApp({ house, container, canvas, uiRoot }) {
 
   // ---------------------------------------------------------------- scena i geometria
   const { scene, houseGroup } = createScene();
-  const built = buildHouse(house);
+  const built = buildHouse(house, design);
   houseGroup.add(built.group);
-  const collision = buildCollision(house);
+  const collision = buildCollision(house, design);
 
   const furnitureGroups = new Map();
   for (const level of house.levels) {
@@ -308,6 +327,7 @@ export function createApp({ house, container, canvas, uiRoot }) {
 
   const app = {
     house,
+    design,
     store,
     three: THREE,
     scene,
@@ -350,7 +370,7 @@ export function createApp({ house, container, canvas, uiRoot }) {
     },
     ui: { openPanel: ui.openPanel, closePanel: ui.closePanel, addToolbarButton: ui.addToolbarButton, toast: ui.toast },
     picking: { setDragHandler: picking.setDragHandler, hitTest: picking.hitTest, floorPoint: picking.floorPoint },
-    collision: { walls: collision.walls, pointInRoom: collision.pointInRoom, roomPolygon: collision.roomPolygon },
+    collision: { walls: collision.walls, pointInRoom: collision.pointInRoom, roomPolygon: collision.roomPolygon, ceilingAt: collision.ceilingAt },
     variant: {
       get: () => store.getState().variant,
       update(mutator) {

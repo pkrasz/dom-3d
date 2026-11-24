@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "name": "Opcje bryły – decyzje aranżacyjne właściciela",
+    "schemaVersion": 1,
+    "units": "m",
+    "rule": "Ten plik zawiera wyłącznie odstępstwa BRYŁY od projektu (house.json zostaje wierny projektowi). Każda opcja jest jawna i wyłączalna: usunięcie jej z pliku przywraca bryłę z projektu. Pusty obiekt {} = dokładnie projekt.",
+    "note": "Wszystkie opcje to założenia do uzgodnienia z projektantem / konstruktorem przed wykonaniem."
+  },
+
+  "stairs": {
+    "groundFloorBalustrade": "slats",
+    "slats": {
+      "profile": 0.04,
+      "clearGap": 0.11,
+      "color": "#1d1d1f",
+      "note": "Na parterze zamiast balustrady biegu dolnego czarne pionowe lamele 4 × 4 cm od stopnic do spodu stropu (+2,70), w linii dawnej balustrady (od strony korytarza). Po dwie lamele na stopień: rozstaw osi 13,5 cm, w świetle 9,5 cm. Nad częścią biegu pod otworem klatki lamele spina poziomy profil 4 × 4 cm na wysokości spodu stropu. Balustrady przy otworze klatki na poddaszu zostają. Założenie do uzgodnienia z projektantem / konstruktorem (mocowanie lameli, wymagania dla balustrad: prześwity i wysokość)."
+    },
+    "treads": {
+      "tread": "#b88a5c",
+      "riser": "#efe9de",
+      "thickness": 0.04,
+      "nosing": 0.02,
+      "note": "Stopnice z ciepłego drewna dębowego (deska 4 cm, nosek 2 cm na biegach prostych), podstopnice i boki schodów jasne. Rzędne stopnic bez zmian względem projektu (deska mieści się w wysokości stopnia). Założenie do uzgodnienia z projektantem / konstruktorem (okładzina schodów żelbetowych, grubość warstw)."
+    }
+  },
+
+  "openCeiling": {
+    "rooms": ["1/9", "1/10", "1/11"],
+    "beams": {
+      "color": "#a87748",
+      "collarTies": {
+        "underside": 2.65,
+        "width": 0.12,
+        "height": 0.18,
+        "spacing": 0.905,
+        "anchorX": 1.4825,
+        "note": "Jętki w poprzek domu (wzdłuż y). Spód 2,65 m nad posadzką = +5,68 (spód jętek z przekroju projektu; dawny sufit był 10 cm niżej). Rozstaw osi 90,5 cm i położenie wyliczone z okien dachowych (okno 78 cm między krokwiami, odstęp osi okien OP2–OP3 = 90,5 cm; oś ustawiona tak, żeby krokwie obejmowały okno OP1) – projekt więźby nie jest wpisany w house.json. Przekrój 12 × 18 cm przyjęty (belka widoczna). Założenie do uzgodnienia z projektantem / konstruktorem."
+      },
+      "purlins": {
+        "axesY": [2.40, 7.70],
+        "width": 0.14,
+        "height": 0.16,
+        "note": "Płatwie w osiach y = 2,40 i y = 7,70 (wg opisu strychu w house.json), pokazane tylko tam, gdzie przechodzą przez pomieszczenia z otwartym sufitem (oś 7,70: pomieszczenia 1/10 i 1/11). Leżą pod jętkami: wierzch płatwi = spód jętek, spód 2,49 m nad posadzką. Przekrój 14 × 16 cm przyjęty. Założenie do uzgodnienia z projektantem / konstruktorem."
+      }
+    },
+    "note": "Sypialnia 1/9, łazienka 1/10 i garderoba 1/11: bez sufitu płaskiego na 2,55 m. Okładzina skosu biegnie tą samą płaszczyzną co skos z projektu (h = 1,425 + 0,70 · u od lica ścianki kolankowej) aż do kalenicy (y = 5,05; najwyżej ok. 4,79 m nad posadzką), po obu stronach kalenicy. Ściany tych pomieszczeń, także działowe i wspólne z sąsiadami o suficie płaskim, sięgają do tej płaszczyzny. Na poziomie dawnego sufitu widoczne drewniane belki. Strych nad pozostałymi pomieszczeniami bez zmian. Założenie do uzgodnienia z projektantem / konstruktorem (ocieplenie i wentylacja połaci do kalenicy, wyłaz dachowy WD nad sypialnią, ściany działowe wyższe niż w projekcie, rola jętek i płatwi w więźbie)."
+  }
+}

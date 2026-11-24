@@ -1,4 +1,4 @@
-// Składa cały model domu z house.json.
+// Składa cały model domu z house.json (+ opcje bryły z design.json: pusty obiekt = dokładnie projekt).
 //
 // Wynik:
 //   group    – THREE.Group w UKŁADZIE DOMU (x, y, z w górę); scena obraca ją o -90° wokół X,
@@ -17,11 +17,17 @@ import { shellInfo, emitFacades, emitSlab, emitCaps } from './shell.js';
 import { emitSite } from './site.js';
 import { emitRoof } from './roof.js';
 import { emitStairs, emitBalustrades } from './stairs.js';
+import { emitBeams } from './beams.js';
+import { designStaticColors } from './design.js';
 import { emitReveals, emitJoinery } from './joinery.js';
 import { createSurfaceMaterial, createStaticMaterials } from '../render/materials.js';
 
-export function buildHouse(house) {
-  const models = house.levels.map((_, i) => buildLevelModel(house, i));
+/**
+ * @param {Object} house   zawartość house.json
+ * @param {Object} [design] opcje bryły z design.json (lamele przy schodach, stopnie drewniane, sufit otwarty do kalenicy)
+ */
+export function buildHouse(house, design = {}) {
+  const models = house.levels.map((_, i) => buildLevelModel(house, i, design));
   const info = shellInfo(house);
   const group = new Group();
   group.name = 'dom';
@@ -76,10 +82,11 @@ export function buildHouse(house) {
   emitCaps(house, models, info, batch);
   emitSite(house, info, batch);
   emitRoof(house, batch);
-  emitStairs(house, batch);
-  emitBalustrades(house, batch);
+  emitStairs(house, batch, design);
+  emitBalustrades(house, batch, design);
+  emitBeams(house, models, design, batch);
 
-  const materials = createStaticMaterials();
+  const materials = createStaticMaterials(designStaticColors(design));
   for (const b of batches.values()) {
     if (b.builder.isEmpty) continue;
     const mesh = new Mesh(b.builder.build(), materials[b.material]);
@@ -96,5 +103,5 @@ export function buildHouse(house) {
   });
   const stats = { surfaces: surfaces.size, staticMeshes: statics.length, drawCalls: surfaces.size + statics.length, triangles };
 
-  return { group, surfaces, statics, staticMaterials: materials, models, shell: info, stats };
+  return { group, surfaces, statics, staticMaterials: materials, models, shell: info, stats, design };
 }

@@ -205,7 +205,7 @@ export function init(app) {
     onDuplicate: () => duplicate(),
     onMoveHere: () => moveHere(),
     onDelete: () => remove(),
-    onColor: (hex) => setColor(hex),
+    onColor: (hex, slot) => setColor(hex, slot),
     onSize: (size) => setSize(size),
     onMount: (z) => setMount(z),
   });
@@ -255,6 +255,7 @@ export function init(app) {
     const item = {
       id: newId(), type: type.id, levelId: anchor.levelId,
       ...posePatch(spot), w: type.size.w, d: type.size.d, h: type.size.h, color: type.color,
+      ...(type.color2 ? { color2: type.color2 } : {}), // typy dwukolorowe (np. fronty + blat)
       ...(type.mount !== undefined ? { z: type.mount } : {}), // meble wiszące: wysokość spodu nad posadzką
     };
     lastFloorTap = null; // podpowiedź zużyta – kolejny mebel stanie na środku widoku
@@ -317,10 +318,14 @@ export function init(app) {
     return true;
   }
 
-  function setColor(hex) {
+  /** slot 2 = drugi kolor (tylko typy, które go mają – np. blat przy frontach); domyślnie kolor główny. */
+  function setColor(hex, slot = 1) {
     const item = selectedItem();
     if (!item || !/^#[0-9a-f]{6}$/i.test(hex)) return false;
-    patchItem(item.id, { color: hex.toLowerCase() });
+    if (slot === 2) {
+      if (!typeOf(item).color2) return false;
+      patchItem(item.id, { color2: hex.toLowerCase() });
+    } else patchItem(item.id, { color: hex.toLowerCase() });
     return true;
   }
 

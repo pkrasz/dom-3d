@@ -3,9 +3,15 @@
 import { isVertical } from '../../tools/geometry.mjs';
 import { pointInPolygon, pointInRect, subtractIntervals, distanceToPolygonEdge, distanceToRect, polygonBBox } from './plan.js';
 import { stairModel, balustradeSegments } from './stairs.js';
+import { ceilingAtPoint } from './levelModel.js';
 import { DOOR_FRAME, WALK_MAX_STEP, WALK_MIN_HEADROOM, BALUSTRADE_RAIL } from './constants.js';
 
-export function buildCollision(house) {
+/**
+ * @param {Object} house    zawartość house.json
+ * @param {Object} [design] opcje bryły z design.json – wpływają tylko na ceilingAt (sufit otwarty do kalenicy);
+ *                          rzut blokad (ściany, balustrady / lamele) jest taki sam jak w projekcie.
+ */
+export function buildCollision(house, design = {}) {
   const levels = house.levels;
   const stairs = stairModel(house);
   const balustrades = balustradeSegments(house);
@@ -51,6 +57,15 @@ export function buildCollision(house) {
     if (!level) return null;
     const room = level.rooms.find((r) => pointInPolygon(x, y, r.polygon));
     return room ? room.id : null;
+  }
+
+  /**
+   * Wysokość pomieszczenia nad posadzką kondygnacji w punkcie (x, y): sufit płaski, skos, a w pomieszczeniu
+   * z sufitem otwartym do kalenicy (design.json) – okładzina skosu. null dla nieznanej kondygnacji.
+   */
+  function ceilingAt(levelId, x, y) {
+    const level = levelById(levelId);
+    return level ? ceilingAtPoint(level, design, x, y) : null;
   }
 
   function roomPolygon(levelId, roomId) {
@@ -142,7 +157,7 @@ export function buildCollision(house) {
     return { x: edge[0][0] + dir * 0.45, y: (edge[0][1] + edge[1][1]) / 2, z: level.floorLevel, headingDeg: dir > 0 ? 180 : 0 };
   }
 
-  return { walls, pointInRoom, roomPolygon, levelIdAtHeight, groundAt, roomSpot, stairsSpot, stairs, balustrades };
+  return { walls, pointInRoom, roomPolygon, ceilingAt, levelIdAtHeight, groundAt, roomSpot, stairsSpot, stairs, balustrades };
 }
 
 /**

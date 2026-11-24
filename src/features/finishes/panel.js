@@ -402,7 +402,10 @@ export function createFinishPanel(app, { applier, textures, recent, onClose }) {
     if (draw === 'tiles') {
       out.push(label('Układ'));
       out.push(seg([['straight', 'Prosty'], ['brick', 'Na cegiełkę']], p.pattern, (pattern) => patchMaterial({ pattern }), 'Układ płytek'));
+    }
 
+    // fuga: płytki oraz gres układany w jodełkę (texture.tileJoint)
+    if (draw === 'tiles' || (def.texture.tileJoint && def.grout)) {
       out.push(label('Szerokość fugi (mm)'));
       out.push(el('div', { class: 'fin-chips' }, GROUT_WIDTHS_MM.map((mm) =>
         chip(mm === 0 ? 'bez fugi' : String(mm), Math.abs(p.groutWidth * 1000 - mm) < 0.05, () => patchMaterial({ groutWidth: mm / 1000 })))));

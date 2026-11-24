@@ -1,5 +1,5 @@
-// Zawartość panelu „Warianty”: lista z aktywnym wariantem, udostępnianie (link / plik), nowy / kopia, zmiana nazwy,
-// usuwanie, eksport / import.
+// Zawartość panelu „Warianty”: lista z aktywnym wariantem, udostępnianie (link / plik), nowy / kopia, gotowe
+// aranżacje, zmiana nazwy, usuwanie, eksport / import.
 // Panel nie ma własnych danych – rysuje to, co zwraca controller.getState(), i woła jego operacje.
 // Zmiana nazwy i potwierdzenie usunięcia dzieją się w wierszu listy (bez okien prompt/confirm – wygodniej palcem).
 import { el } from '../../ui/dom.js';
@@ -39,7 +39,8 @@ export function statusText({ status, savedAt }) {
  * @param {?Object} [deps.nav]   navigator (share, canShare, clipboard) – podmieniany w testach
  * @param {(filename: string, text: string) => File} [deps.makeFile]
  * @param {(text: string) => Promise<boolean>} [deps.pasteLink]  odbiór wklejonego linku (receive.js); brak → bez tej sekcji
- * @returns {{element: HTMLElement, dispose: () => void}}
+ * @returns {{element: HTMLElement, dispose: () => void, idle: () => Promise<void>}}
+ *   idle() – czeka na zakończenie rozpoczętych operacji asynchronicznych panelu (udostępnianie, plik, import)
  */
 export function createVariantsPanel(controller, {
   toast, download = downloadText, readFile = readFileText,
@@ -53,9 +54,28 @@ export function createVariantsPanel(controller, {
 
   const statusEl = el('p', { class: 'war-status', role: 'status' });
   const listEl = el('ul', { class: 'war-list' });
-  const fileInput = el('input', { type: 'file', accept: '.json,application/json', class: 'war-file', tabindex: '-1', 'aria-hidden': 'true', onchange: onFile });
+  const fileInput = el('input', { type: 'file', accept: '.json,application/json', class: 'war-file', tabindex: '-1', 'aria-hidden': 'true', onchange: () => track(onFile)() });
 
-  const button = (label, onClick, extraClass = '') => el('button', { class: `btn war-btn ${extraClass}`.trim(), type: 'button', onclick: onClick }, label);
+  // Operacje asynchroniczne uruchamiane przyciskami (link wymaga kompresji, plik – systemowego arkusza). Panel pamięta
+  // ostatnią obietnicę, żeby dało się na nie POCZEKAĆ (idle) zamiast zgadywać, ile to potrwa.
+  let pending = Promise.resolve();
+  const track = (fn) => (...args) => {
+    const result = fn(...args);
+    if (result && typeof result.then === 'function') {
+      const done = Promise.resolve(result).catch((err) => console.error(err));
+      pending = Promise.all([pending, done]);
+    }
+    return result;
+  };
+  async function idle() {
+    let seen;
+    do {
+      seen = pending;
+      await seen;
+    } while (seen !== pending); // w trakcie czekania mogła zacząć się kolejna operacja
+  }
+
+  const button = (label, onClick, extraClass = '') => el('button', { class: `btn war-btn ${extraClass}`.trim(), type: 'button', onclick: track(onClick) }, label);
   const iconButton = (icon, label, onClick, disabled = false) =>
     el('button', { class: 'btn btn--icon war-icon', type: 'button', 'aria-label': label, title: label, html: icon, disabled, onclick: onClick });
 
@@ -103,6 +123,24 @@ export function createVariantsPanel(controller, {
     el('p', { class: 'war-note' }, 'Zwykle wystarczy stuknąć link. Jeśli używasz ikony na ekranie telefonu albo wariant się nie pojawił – skopiuj link z wiadomości i wklej go tutaj.'),
   ] : [];
 
+  // ---------------------------------------------------------------- gotowe aranżacje (rejestr presets/index.js)
+  // Zawsze dodawane jako NOWY wariant – istniejące zostają bez zmian (kolizja nazwy → dopisek, jak przy imporcie).
+  const presets = typeof controller.listPresets === 'function' ? controller.listPresets() : [];
+  const addPreset = (id) => {
+    const result = controller.addPreset(id);
+    if (result && result.message) toast(result.message);
+  };
+  const presetSection = presets.length ? [
+    el('div', { class: 'war-presets', role: 'group', 'aria-label': 'Gotowe aranżacje' }, [
+      el('h4', { class: 'war-subhead' }, 'Gotowe aranżacje'),
+      ...presets.map((p) => el('div', { class: 'war-preset', dataset: { preset: p.id } }, [
+        button(p.name, () => addPreset(p.id), 'war-preset__btn'),
+        ...(p.description ? [el('p', { class: 'war-note' }, p.description)] : []),
+      ])),
+      el('p', { class: 'war-note' }, 'Gotowa aranżacja pojawia się na liście jako nowy wariant – Twoje warianty zostają bez zmian.'),
+    ]),
+  ] : [];
+
   const root = el('div', { class: 'war' }, [
     statusEl,
     listEl,
@@ -117,6 +155,7 @@ export function createVariantsPanel(controller, {
       button('Pusty z meblami z projektu', () => report(controller.createFromProject())),
       button('Kopia bieżącego', () => report(controller.duplicateActive())),
     ]),
+    ...presetSection,
     el('h3', { class: 'war-head' }, 'Plik'),
     el('div', { class: 'war-actions' }, [
       button('Eksportuj bieżący', () => doExport('active')),
@@ -360,5 +399,5 @@ export function createVariantsPanel(controller, {
   renderList();
   renderStatus();
 
-  return { element: root, dispose: off };
+  return { element: root, dispose: off, idle };
 }

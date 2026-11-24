@@ -7,7 +7,8 @@
 //  - Pozostałe funkcje (wykończenia, meble) nic o liście nie wiedzą – dostają 'variant:change' z pełnym wariantem.
 import { cloneVariant } from '../../app/variant.js';
 import {
-  APP_ID, CURRENT_VERSION, LIMITS, cleanName, parseImport, parseStoredState, resolveCollisions, sanitizeFurnitureList, uniqueId, uniqueName,
+  APP_ID, CURRENT_VERSION, LIMITS, cleanName, parseImport, parseStoredState, resolveCollisions, sanitizeFurnitureList, sanitizeVariant,
+  uniqueId, uniqueName,
 } from './validate.js';
 import { buildExport, exportFileName, plural } from './io.js';
 import { SHARE_MESSAGES, createShareLink, decodeShare } from './share.js';
@@ -51,10 +52,11 @@ export function defaultMakeId() {
  * @param {number} [deps.saveDelay]
  * @param {() => string} [deps.baseUrl]           adres strony do linków „Udostępnij” (bez fragmentu)
  * @param {Object} [deps.streams]                 CompressionStream / DecompressionStream (podmieniane w testach)
+ * @param {import('./presets/index.js').Preset[]} [deps.presets]  gotowe aranżacje (rejestr presets/index.js)
  */
 export function createController(app, {
   storage, makeId = defaultMakeId, now = () => new Date(), createStarter = () => [], saveDelay = SAVE_DELAY_MS,
-  baseUrl = defaultBaseUrl, streams = globalThis,
+  baseUrl = defaultBaseUrl, streams = globalThis, presets = [],
 }) {
   const toast = (text) => app.ui.toast(text, { duration: 7000 });
   const levelIds = app.house.levels.map((l) => l.id);
@@ -291,6 +293,33 @@ export function createController(app, {
         notify('list');
       }
       return { ok: true, message: parts.join(' '), count: incoming.length, report: r, ids: incoming.map((v) => v.id) };
+    },
+
+    // ---------------------------------------------------------------------------------------- gotowe aranżacje
+    /** Gotowe aranżacje do pokazania w panelu. @returns {{id: string, name: string, description: string}[]} */
+    listPresets: () => presets.map((p) => ({ id: p.id, name: p.name, description: p.description || '' })),
+
+    /**
+     * Dodaje gotową aranżację jako NOWY wariant i przełącza na niego. Istniejących wariantów nie rusza:
+     * kolizja id → nowy id, kolizja nazwy → dopisek „(2)” (jak przy imporcie). Dane przechodzą tę samą walidację
+     * co plik importu – wykończenia powierzchni, których nie ma w bieżącej bryle, są pomijane.
+     * @param {string} presetId
+     */
+    addPreset(presetId) {
+      const preset = presets.find((p) => p.id === presetId);
+      if (!preset) return { ok: false, message: 'Nie ma takiej gotowej aranżacji.' };
+      if (full()) return { ok: false, message: fullMessage };
+      let clean = null;
+      try {
+        clean = sanitizeVariant({ ...preset.create(), name: preset.name }, importCtx());
+      } catch (err) {
+        console.error(`Nie udało się przygotować aranżacji "${presetId}":`, err);
+      }
+      if (!clean) return { ok: false, message: 'Nie udało się przygotować tej aranżacji.' };
+      const [added] = resolveCollisions(variants, [clean.variant], makeId);
+      app.variant.set(added);
+      const parts = [`Dodano wariant «${added.name}».`, ...reportParts(clean.report)];
+      return { ok: true, id: added.id, name: added.name, message: parts.join(' '), report: clean.report };
     },
 
     // ---------------------------------------------------------------------------------------- udostępnianie linkiem

@@ -8,6 +8,7 @@
 //   panel.js      – zawartość panelu „Warianty”
 //   share.js      – wariant zakodowany w linku (#w=…): kodowanie i dekodowanie
 //   receive.js    – odbiór wariantu z linku: pytanie „Dodać wariant?”
+//   presets/      – gotowe aranżacje (rejestr index.js + dane), dodawane z panelu jako nowe warianty
 //
 // init(app) jest wołane PIERWSZE (przed wykończeniami i meblami): po nim app.variant.get() zwraca już wczytany wariant.
 import './variants.css';
@@ -16,6 +17,7 @@ import { createStorage } from './storage.js';
 import { createController, defaultMakeId } from './controller.js';
 import { createVariantsPanel, ICONS } from './panel.js';
 import { createShareReceiver } from './receive.js';
+import { PRESETS } from './presets/index.js';
 
 /**
  * @param {import('../../app/app.js').App} app
@@ -27,6 +29,7 @@ import { createShareReceiver } from './receive.js';
  * @param {Window} [deps.win]              okno z adresem strony (link do wariantu, 'hashchange')
  * @param {?Object} [deps.nav]             navigator (udostępnianie, schowek)
  * @param {() => string} [deps.baseUrl]    adres strony do linków
+ * @param {import('./presets/index.js').Preset[]} [deps.presets]  gotowe aranżacje (domyślnie rejestr presets/index.js)
  * @param {() => Promise<void>} [deps.defer]  na co czekać przed pytaniem o wariant z linku (domyślnie następna klatka)
  * @returns {ReturnType<typeof createController> & {openPanel: () => void, destroy: () => void}}
  */
@@ -37,6 +40,7 @@ export function init(app, deps = {}) {
     makeId: deps.makeId || defaultMakeId,
     now: deps.now || (() => new Date()),
     createStarter: createStarterFurniture,
+    presets: deps.presets || PRESETS,
     ...(deps.baseUrl ? { baseUrl: deps.baseUrl } : {}),
   });
 

@@ -633,7 +633,7 @@ describe('panel', () => {
       files.push(result);
       Object.defineProperty(input, 'files', { configurable: true, value: [{ name: 'plik.json', size: 10 }] });
       input.dispatchEvent(new Event('change'));
-      await new Promise((r) => setTimeout(r, 0));
+      await view.idle(); // koniec odczytu pliku i importu – bez zgadywania czasu
     };
     await pick({ ok: true, text: controller.exportData('active').text });
     expect(toasts.at(-1)).toMatch(/Zaimportowano 1 wariant\./);
@@ -699,6 +699,99 @@ describe('init(app) – całość z przyciskiem na pasku', () => {
   });
 });
 
+// ================================================================================================ gotowe aranżacje
+describe('gotowe aranżacje (rejestr podmieniony – tu tylko mechanizm)', () => {
+  const PRESETS = [
+    {
+      id: 'loft', name: 'Ciemny', description: 'Opis loftu.',
+      create: () => ({
+        id: 'b', name: 'nazwa z danych', customMaterials: [],
+        finishes: { 'parter:0/3:floor': { kind: 'paint', color: '#101010' }, 'parter:9/9:floor': { kind: 'paint', color: '#202020' } },
+        furniture: [{ ...sofa, id: 'p1', color2: '#b5895a' }, { ...sofa, id: 'p2', z: 1.2 }, { type: 'zepsuty' }],
+      }),
+    },
+    { id: 'zepsuta', name: 'Zepsuta', description: '', create: () => { throw new Error('bum'); } },
+  ];
+  const withPresets = (raw = fakeStorage({ [STORAGE_KEY]: storedState() })) => {
+    const app = fakeApp();
+    const controller = createController(app, { storage: createStorage({ storage: raw }), makeId: idGenerator(), now: () => NOW, createStarter: () => [sofa], presets: PRESETS });
+    return { app, raw, controller };
+  };
+
+  it('addPreset: nowy aktywny wariant po walidacji importu; kolizja id → nowy id, kolizja nazwy → dopisek; nic nie nadpisane', () => {
+    const { app, controller, raw } = withPresets();
+    const before = JSON.stringify(controller.getState().variants);
+    expect(controller.listPresets()).toEqual([{ id: 'loft', name: 'Ciemny', description: 'Opis loftu.' }, { id: 'zepsuta', name: 'Zepsuta', description: '' }]);
+
+    const result = controller.addPreset('loft');
+    expect(result).toMatchObject({ ok: true, name: 'Ciemny (2)', id: 'gen-1' });
+    expect(result.message).toBe('Dodano wariant «Ciemny (2)». Pominięto 1 wykończenie powierzchni, których nie ma w tym domu. Odrzucono 1 błędny element.');
+    const state = controller.getState();
+    expect(state.variants).toHaveLength(3);
+    expect(JSON.stringify(state.variants.slice(0, 2))).toBe(before);
+    expect(state.activeId).toBe('gen-1');
+    const v = app.variant.get();
+    expect(v.finishes).toEqual({ 'parter:0/3:floor': { kind: 'paint', color: '#101010' } });
+    expect(v.furniture).toEqual([{ ...sofa, id: 'p1', color2: '#b5895a' }, { ...sofa, id: 'p2', z: 1.2 }]); // pola dodatkowe zostają
+    vi.advanceTimersByTime(500);
+    expect(saved(raw).variants.map((x) => x.name)).toEqual(['Jasny', 'Ciemny', 'Ciemny (2)']);
+
+    expect(controller.addPreset('loft')).toMatchObject({ ok: true, name: 'Ciemny (3)' });
+  });
+
+  it('nieznana albo zepsuta aranżacja i pełna lista: komunikat, stan bez zmian', () => {
+    const { app, controller } = withPresets();
+    const before = JSON.stringify(controller.getState());
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(controller.addPreset('brak')).toEqual({ ok: false, message: 'Nie ma takiej gotowej aranżacji.' });
+    expect(controller.addPreset('zepsuta')).toEqual({ ok: false, message: 'Nie udało się przygotować tej aranżacji.' });
+    expect(errors).toHaveBeenCalledTimes(1);
+    errors.mockRestore();
+    expect(JSON.stringify(controller.getState())).toBe(before);
+
+    while (controller.getState().variants.length < LIMITS.variants) controller.createFromProject();
+    const active = app.variant.get().id;
+    expect(controller.addPreset('loft')).toMatchObject({ ok: false, message: expect.stringMatching(/najwyżej 30 wariantów/) });
+    expect(controller.getState().variants).toHaveLength(LIMITS.variants);
+    expect(app.variant.get().id).toBe(active);
+  });
+
+  it('panel: grupa „Gotowe aranżacje” w sekcji „Nowy wariant”; przycisk dodaje wariant i pokazuje komunikat', () => {
+    const ctx = withPresets();
+    const toasts = [];
+    const view = createVariantsPanel(ctx.controller, { toast: (t) => toasts.push(t), nav: null });
+    document.body.replaceChildren(view.element);
+    const group = view.element.querySelector('.war-presets');
+    expect(group.getAttribute('aria-label')).toBe('Gotowe aranżacje');
+    expect(group.querySelector('.war-subhead').textContent).toBe('Gotowe aranżacje');
+    expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Ciemny', 'Zepsuta']);
+    expect(group.textContent).toContain('Opis loftu.');
+    expect(group.textContent).toMatch(/Twoje warianty zostają bez zmian/);
+    const heads = [...view.element.querySelectorAll('.war-head, .war-subhead')].map((h) => h.textContent);
+    expect(heads.indexOf('Gotowe aranżacje')).toBe(heads.indexOf('Nowy wariant') + 1);
+
+    group.querySelector('[data-preset="loft"] button').click();
+    expect(view.element.querySelectorAll('.war-item')).toHaveLength(3);
+    expect(view.element.querySelector('.war-item.is-active .war-name').textContent).toBe('Ciemny (2)');
+    expect(toasts.at(-1)).toMatch(/^Dodano wariant «Ciemny \(2\)»/);
+
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    group.querySelector('[data-preset="zepsuta"] button').click();
+    errors.mockRestore();
+    expect(toasts.at(-1)).toBe('Nie udało się przygotować tej aranżacji.');
+    expect(view.element.querySelectorAll('.war-item')).toHaveLength(3);
+    view.dispose();
+  });
+
+  it('bez rejestru (pusta lista) panel nie ma tej grupy', () => {
+    const { controller } = setup({ raw: fakeStorage({ [STORAGE_KEY]: storedState() }) });
+    const view = createVariantsPanel(controller, { toast: () => {}, nav: null });
+    expect(view.element.querySelector('.war-presets')).toBeNull();
+    expect(view.element.textContent).not.toContain('Gotowe aranżacje');
+    view.dispose();
+  });
+});
+
 // ================================================================================================ udostępnianie
 describe('udostępnianie wariantu linkiem', () => {
   const BASE = 'https://przyklad.github.io/dom-3d/';
@@ -745,7 +838,10 @@ describe('udostępnianie wariantu linkiem', () => {
   const withBase = (ctxOptions = {}) => {
     const app = fakeApp();
     const raw = ctxOptions.raw || fakeStorage({ [STORAGE_KEY]: storedState() });
-    const controller = createController(app, { storage: createStorage({ storage: raw }), makeId: idGenerator(), now: () => NOW, createStarter: () => [sofa], baseUrl: () => BASE });
+    const controller = createController(app, {
+      storage: createStorage({ storage: raw }), makeId: idGenerator(), now: () => NOW, createStarter: () => [sofa], baseUrl: () => BASE,
+      ...(ctxOptions.streams ? { streams: ctxOptions.streams } : {}),
+    });
     return { app, raw, controller };
   };
 
@@ -1042,10 +1138,12 @@ describe('udostępnianie wariantu linkiem', () => {
       });
       document.body.replaceChildren(view.element);
       const byText = (text) => [...view.element.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
+      // Link wymaga kompresji (CompressionStream – osobny wątek), więc czas jego powstania nie jest stały: pod obciążeniem
+      // (pełne `npm test`, wiele plików naraz) dwa obroty pętli zdarzeń nie wystarczały i test padał losowo.
+      // Czekamy na samą operację panelu (view.idle), nie na zegar.
       const click = async (text) => {
         byText(text).click();
-        await tick();
-        await tick();
+        await view.idle();
       };
       return { ...ctx, view, toasts, downloads, byText, click, linkBox: () => view.element.querySelector('.war-link') };
     };
@@ -1133,6 +1231,28 @@ describe('udostępnianie wariantu linkiem', () => {
       await r.click('Wyślij plik');
       expect(r.downloads).toEqual([]);
       expect(r.toasts).toEqual([]);
+    });
+
+    it('wolna kompresja linku (obciążony telefon / komputer): kliknięcie i tak kończy się udostępnieniem', async () => {
+      // kompresja, która oddaje wynik dopiero po kilkudziesięciu milisekundach – dużo dłużej niż parę obrotów pętli zdarzeń
+      class SlowCompressionStream {
+        constructor(format) {
+          const inner = new CompressionStream(format);
+          const reader = inner.readable.getReader();
+          this.writable = inner.writable;
+          this.readable = { getReader: () => ({ read: () => new Promise((r) => setTimeout(r, 30)).then(() => reader.read()), cancel: () => reader.cancel() }) };
+        }
+      }
+      const shared = [];
+      const p = open({ share: async (data) => shared.push(data) }, withBase({ streams: { CompressionStream: SlowCompressionStream, DecompressionStream } }));
+      await p.click('Udostępnij'); // link jeszcze się liczy (przygotowanie zaczęło się przy otwarciu panelu)
+      expect(shared).toHaveLength(1);
+      expect(shared[0].url).toMatch(/#w=1\.z\./);
+      const other = p.controller.getState().variants.find((v) => v.id !== p.controller.getState().activeId);
+      p.controller.switchTo(other.id);
+      await p.click('Udostępnij'); // zaraz po przełączeniu: nowy link dopiero powstaje
+      expect(shared).toHaveLength(2);
+      expect((await withBase().controller.readShared(shared[1].url.split('#w=')[1])).variant.name).toBe(other.name);
     });
 
     it('po przełączeniu wariantu link dotyczy nowego aktywnego', async () => {

@@ -52,6 +52,46 @@ export function ceilingBreaks(level) {
   return uniqueSorted(slopes.flatMap((s) => [s.kneeWallFace, s.flatFrom]));
 }
 
+// ---------------------------------------------------------------- opcja bryły: sufit otwarty do kalenicy (design.json)
+
+/** Pomieszczenia kondygnacji z sufitem otwartym do kalenicy (design.openCeiling.rooms); tylko kondygnacja ze skosami. */
+export function openRoomIds(level, design) {
+  const wanted = design?.openCeiling?.rooms;
+  if (!Array.isArray(wanted) || !level.ceiling?.slopes?.length) return new Set();
+  return new Set(level.rooms.filter((r) => wanted.includes(r.id)).map((r) => r.id));
+}
+
+/** Współrzędna y, w której spotykają się płaszczyzny okładziny obu skosów (pod kalenicą) – albo null. */
+export function slopeRidgeY(level) {
+  const slopes = level.ceiling?.slopes || [];
+  const s = slopes.find((sl) => sl.side === '-y');
+  const n = slopes.find((sl) => sl.side === '+y');
+  if (!s || !n) return null;
+  return (n.heightAtWall - s.heightAtWall + n.risePerMeter * n.kneeWallFace + s.risePerMeter * s.kneeWallFace) / (s.risePerMeter + n.risePerMeter);
+}
+
+/** Wysokość okładziny skosu nad posadzką BEZ sufitu płaskiego: płaszczyzna skosu przedłużona do kalenicy. */
+export function openCeilingAt(level, y) {
+  const slopes = level.ceiling?.slopes;
+  if (!slopes) return level.ceilingHeight;
+  const faces = slopes.map((s) => s.kneeWallFace);
+  const yc = Math.min(Math.max(y, Math.min(...faces)), Math.max(...faces));
+  return Math.min(...slopes.map((s) => s.heightAtWall + s.risePerMeter * Math.abs(yc - s.kneeWallFace)));
+}
+
+/**
+ * Wysokość pomieszczenia nad posadzką w punkcie (x, y) z uwzględnieniem opcji bryły:
+ * w pomieszczeniu z sufitem otwartym – do okładziny skosu, poza nim jak ceilingAt().
+ */
+export function ceilingAtPoint(level, design, x, y) {
+  const open = openRoomIds(level, design);
+  if (open.size) {
+    const room = level.rooms.find((r) => open.has(r.id) && pointInPolygon(x, y, r.polygon));
+    if (room) return openCeilingAt(level, y);
+  }
+  return ceilingAt(level, y);
+}
+
 function edgeOf(polygon, i, ccw) {
   const a = polygon[i];
   const b = polygon[(i + 1) % polygon.length];
@@ -97,8 +137,11 @@ function touchingIntervals(edge, rects, side) {
  *   holes  – otwory {id, s0, s1, z0, z1, opening} (z nad posadzką),
  *   strips – pasy podciągu/nadproża nad odcinkami otwartymi {s0, s1, z0, header},
  *   topPieces(s0, s1) – górna krawędź ściany jako odcinki liniowe {s0, s1, t0, t1} (wysokość nad posadzką).
+ * design – opcje bryły z design.json (pusty obiekt = dokładnie projekt). Model dostaje:
+ *   openRooms (Set id pomieszczeń z sufitem otwartym do kalenicy), isOpenRoom(id),
+ *   ceilingAtRoom(id, y) i breaksFor(id) – wysokość i punkty załamania sufitu DLA DANEGO pomieszczenia.
  */
-export function buildLevelModel(house, levelIndex) {
+export function buildLevelModel(house, levelIndex, design = {}) {
   const level = house.levels[levelIndex];
   const upper = house.levels[levelIndex + 1] || null;
   const solids = solidsOf(level);
@@ -107,6 +150,12 @@ export function buildLevelModel(house, levelIndex) {
   const voidAbove = voidAboveOf(level);
   const breaks = ceilingBreaks(level);
   const floor = level.floorLevel;
+  const openRooms = openRoomIds(level, design);
+  const ridgeY = slopeRidgeY(level);
+  const openBreaks = ridgeY === null ? breaks : uniqueSorted([...breaks, ridgeY]);
+  const isOpenRoom = (roomId) => openRooms.has(roomId);
+  const ceilingAtRoom = (roomId, y) => (openRooms.has(roomId) ? openCeilingAt(level, y) : ceilingAt(level, y));
+  const breaksFor = (roomId) => (openRooms.has(roomId) ? openBreaks : breaks);
 
   // Wysokość ściany w miejscu s krawędzi: sufit kondygnacji, a w klatce schodowej – aż do sufitu wyższej kondygnacji.
   const topAt = (edge, s, sProbe) => {
@@ -116,12 +165,12 @@ export function buildLevelModel(house, levelIndex) {
       const y = edge.axis === 'x' ? edge.c : s;
       return upper.floorLevel - floor + ceilingAt(upper, y);
     }
-    return ceilingAt(level, edge.axis === 'x' ? edge.c : s);
+    return ceilingAtRoom(edge.roomId, edge.axis === 'x' ? edge.c : s);
   };
 
   const topPieces = (edge, s0, s1) => {
     const cuts = [s0, s1];
-    if (edge.axis === 'y') cuts.push(...breaks.filter((b) => b > s0 + EPS && b < s1 - EPS));
+    if (edge.axis === 'y') cuts.push(...breaksFor(edge.roomId).filter((b) => b > s0 + EPS && b < s1 - EPS));
     if (voidAbove) cuts.push(...along(edge, voidAbove).filter((b) => b > s0 + EPS && b < s1 - EPS));
     const ss = uniqueSorted(cuts);
     const pieces = [];
@@ -137,6 +186,7 @@ export function buildLevelModel(house, levelIndex) {
     const chimneys = roomChimneys(level, room.id);
     const edges = room.polygon.map((_, i) => {
       const edge = edgeOf(room.polygon, i, ccw);
+      edge.roomId = room.id;
       const behind = mergeIntervals(touchingIntervals(edge, solids.map((s) => s.rect), -1));
       const coveredByChimney = touchingIntervals(edge, chimneys.map((c) => c.rect), +1);
       edge.solid = subtractIntervals(behind, coveredByChimney);
@@ -203,7 +253,7 @@ export function buildLevelModel(house, levelIndex) {
     extOpenings.set(o.id, info);
   }
 
-  return { house, level, index: levelIndex, id: level.id, floor, upper, solids, upperSolids, headers, voidAbove, breaks, rooms, extOpenings, ceilingAt: (y) => ceilingAt(level, y) };
+  return { house, level, index: levelIndex, id: level.id, floor, upper, solids, upperSolids, headers, voidAbove, breaks, rooms, extOpenings, ceilingAt: (y) => ceilingAt(level, y), design, openRooms, isOpenRoom, ceilingAtRoom, breaksFor, ridgeY };
 }
 
 // Czy jakaś część prostokąta leży w wieloboku (sprawdzane w narożnych ćwiartkach – wystarcza dla podciągu B1,

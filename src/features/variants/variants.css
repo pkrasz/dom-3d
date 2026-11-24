@@ -195,6 +195,33 @@
   color: var(--muted);
 }
 
+/* gotowe aranżacje: podgrupa w sekcji „Nowy wariant” – przycisk na całą szerokość, pod nim jedno zdanie opisu */
+.war-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.war-subhead {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.war-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.war-preset__btn {
+  width: 100%;
+  min-height: 44px;
+  font-weight: 600;
+}
+
 /* udostępnianie: przycisk główny wyraźnie większy od pozostałych */
 .war-share {
   flex: 2 1 160px;

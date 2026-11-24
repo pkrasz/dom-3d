@@ -30,7 +30,12 @@ export function buildWallSurfaces(model) {
       //   2. pasy podciągów nad odcinkami otwartymi (userData.headerStart) – znikają razem z sufitami,
       //   3. część ściany klatki schodowej ponad stropem, do sufitu wyższej kondygnacji (userData.upperStart) –
       //      znika razem z wyższą kondygnacją.
-      const split = model.level.ceiling ? Infinity : model.level.ceilingHeight;
+      //   Pomieszczenie z sufitem otwartym do kalenicy (design.json): część ściany ponad dawnym sufitem płaskim
+      //   stoi w siatce razem z pasami podciągów (headerStart) – w domku dla lalek i w rzucie znika razem z sufitami,
+      //   więc ściany kończą się tam na tej samej wysokości co w pozostałych pomieszczeniach.
+      const open = model.isOpenRoom(rm.id);
+      const flatH = model.level.ceiling?.flatHeight ?? model.level.ceilingHeight;
+      const split = open ? flatH : model.level.ceiling ? Infinity : model.level.ceilingHeight;
       const upperPanels = [];
       for (const [s0, s1] of edge.solid) {
         const pieces = edge.topPieces(s0, s1);
@@ -45,10 +50,11 @@ export function buildWallSurfaces(model) {
         emitPanel(b, frame, { bottom: st.z0, pieces, holes: [] });
         for (const p of pieces) height = Math.max(height, p.t0, p.t1);
       }
+      if (open) for (const panel of upperPanels) emitPanel(b, frame, panel);
       if (b.isEmpty) continue;
       const headerStart = b.positions.length / 3 > beforeHeaders ? beforeHeaders : null;
-      const upperStart = upperPanels.length ? b.positions.length / 3 : null;
-      for (const panel of upperPanels) emitPanel(b, frame, panel);
+      const upperStart = !open && upperPanels.length ? b.positions.length / 3 : null;
+      if (!open) for (const panel of upperPanels) emitPanel(b, frame, panel);
       const d = surface(model, rm, 'wall', 'interior', `wall:${edge.index}`, `ściana ${edge.index + 1}`, b, edge.hi - edge.lo, height);
       d.headerStart = headerStart;
       d.upperStart = upperStart;
@@ -88,7 +94,7 @@ export function buildChimneySurfaces(model) {
         if (!free.length) continue;
         const frame = wallFrame({ ...side, floor: model.floor, uOffset: width });
         for (const [s0, s1] of free) {
-          const pieces = profileTop(s0, s1, side.axis === 'y' ? model.breaks : [], (s) => model.ceilingAt(side.axis === 'y' ? s : side.c));
+          const pieces = profileTop(s0, s1, side.axis === 'y' ? model.breaksFor(rm.id) : [], (s) => model.ceilingAtRoom(rm.id, side.axis === 'y' ? s : side.c));
           emitPanel(b, frame, { bottom: 0, pieces, holes: [] });
           for (const p of pieces) height = Math.max(height, p.t0, p.t1);
         }
@@ -180,10 +186,11 @@ export function buildCeilingSurfaces(model) {
     const inRoom = (x, y) =>
       regions.some((p) => pointInPolygon(x, y, p)) && !holes.some((h) => pointInRect(x, y, h));
 
-    // --- sufit płaski (z obniżeniem pod podciągami i nadprożami)
+    // --- sufit płaski (z obniżeniem pod podciągami i nadprożami); w pomieszczeniu otwartym do kalenicy go nie ma
+    const open = model.isOpenRoom(rm.id);
     const b = new MeshBuilder();
     const headerRects = rm.innerHeaders.map((h) => h.rect);
-    for (const poly of regions) {
+    for (const poly of open ? [] : regions) {
       const cells = gridCells(poly, {
         holes, clip: flatBand,
         xCuts: headerRects.flatMap((r) => [r[0], r[2]]),
@@ -221,7 +228,9 @@ export function buildCeilingSurfaces(model) {
     // --- skosy
     for (const sl of slopes) {
       const isSouth = sl.side === '-y';
-      const band = isSouth ? [-Infinity, sl.kneeWallFace, Infinity, sl.flatFrom] : [-Infinity, sl.flatFrom, Infinity, sl.kneeWallFace];
+      // skos kończy się na początku sufitu płaskiego, a w pomieszczeniu otwartym biegnie tą samą płaszczyzną do kalenicy
+      const upTo = open ? model.ridgeY : sl.flatFrom;
+      const band = isSouth ? [-Infinity, sl.kneeWallFace, Infinity, upTo] : [-Infinity, upTo, Infinity, sl.kneeWallFace];
       const r = sl.risePerMeter;
       const k = Math.sqrt(1 + r * r); // długość po skosie na metr rzutu
       const normal = isSouth ? [0, r, -1] : [0, -r, -1];
@@ -231,8 +240,8 @@ export function buildCeilingSurfaces(model) {
       let yMax = -Infinity;
       for (const poly of regions) {
         for (const [x0, y0, x1, y1] of gridCells(poly, { holes: [...holes, ...windowHoles], clip: band })) {
-          const z0 = floor + model.ceilingAt(y0);
-          const z1 = floor + model.ceilingAt(y1);
+          const z0 = floor + model.ceilingAtRoom(rm.id, y0);
+          const z1 = floor + model.ceilingAtRoom(rm.id, y1);
           const v0 = Math.abs(y0 - sl.kneeWallFace) * k;
           const v1 = Math.abs(y1 - sl.kneeWallFace) * k;
           sb.quad([x0, y0, z0], [x1, y0, z0], [x1, y1, z1], [x0, y1, z1], normal, [[x0, v0], [x1, v0], [x1, v1], [x0, v1]]);
@@ -253,6 +262,8 @@ export function buildCeilingSurfaces(model) {
 export function emitCeilingHatches(model, builder) {
   const flatH = model.level.ceiling?.flatHeight ?? model.level.ceilingHeight;
   for (const h of model.level.ceilingHatches || []) {
+    const [cx, cy] = rectCenter(h.rect);
+    if (model.rooms.some((rm) => model.isOpenRoom(rm.id) && pointInPolygon(cx, cy, rm.polygon))) continue; // nie ma tam sufitu płaskiego
     const z = model.floor + flatH;
     builder.box(h.rect[0], h.rect[1], z - HATCH_DROP, h.rect[2], h.rect[3], z, ['top']);
   }

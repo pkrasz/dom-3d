@@ -6,7 +6,13 @@ import {
   corners, aabb, penetration, collides, pushOut, moveItem, snapToWalls, faceWall, touchesRoom, findFreeSpot,
   withHouseBounds, houseBounds, clampToRect, subtractRect, stairBlockers, segmentCrossesWalls, normalizeRot, SNAP_DISTANCE, EPS,
 } from '../src/features/furniture/placement.js';
-import { CATALOG, CATEGORIES, FALLBACK_TYPE, PALETTE, buildParts, getType, typeOf, clampSize } from '../src/features/furniture/catalog.js';
+import * as THREE from 'three';
+import {
+  CATALOG, CATEGORIES, FALLBACK_TYPE, FIXED_COLORS, MOUNT_RANGE, PALETTE, SHAPES, buildParts, getType, typeOf, clampSize, secondColorOf,
+} from '../src/features/furniture/catalog.js';
+import { createModelFactory, slotColor, tint } from '../src/features/furniture/model.js';
+import { sanitizeFurnitureItem } from '../src/features/variants/validate.js';
+import { compactVariant, expandVariant } from '../src/features/variants/share.js';
 import { createStarterFurniture } from '../src/features/furniture/starter.js';
 
 const collision = buildCollision(house);
@@ -362,7 +368,7 @@ describe('meble – katalog', () => {
         let x0 = Infinity;
         let x1 = -Infinity;
         for (const p of parts) {
-          expect(['box', 'cyl']).toContain(p.shape);
+          expect(SHAPES).toContain(p.shape);
           expect(typeof p.mat).toBe('string');
           const tol = 1e-9;
           expect(p.min[0], label).toBeGreaterThanOrEqual(-w / 2 - tol);
@@ -388,6 +394,211 @@ describe('meble – katalog', () => {
     expect(typeOf({ type: 'sofa-3' }).id).toBe('sofa-3');
     const t = getType('szafa');
     expect(clampSize(t, { w: 99, d: 0.01, h: 2.1004 })).toEqual({ w: t.range.w[1], d: t.range.d[0], h: 2.1 });
+  });
+});
+
+describe('meble – katalog: typy wariantu „Montana”', () => {
+  // id → [w, d, h] domyślne (m); lista jest umową z projektantem wariantu – id trafiają do zapisanych wariantów
+  const NEW_TYPES = {
+    'naroznik-duzy': [3.0, 2.2, 0.85], 'naroznik-duzy-prawy': [3.0, 2.2, 0.85], 'fotel-uszak': [0.8, 0.85, 1.05],
+    'stolik-okragly': [0.8, 0.8, 0.42], 'zabudowa-rtv': [2.8, 0.4, 2.3],
+    'stol-6': [1.8, 0.9, 0.76], 'stol-6-krzesla': [1.8, 1.75, 0.9], hoker: [0.4, 0.42, 0.9],
+    'wyspa-barek': [1.8, 0.9, 0.92], 'kuchnia-piekarnik': [0.6, 0.6, 2.1], lodowka: [0.6, 0.65, 1.9], 'polka-wiszaca': [1.2, 0.25, 0.2],
+    'wanna-wolnostojaca': [1.7, 0.8, 0.6], bidet: [0.37, 0.56, 0.4], 'wc-podwieszane': [0.37, 0.54, 0.42],
+    'umywalka-nablatowa': [0.8, 0.48, 0.95], 'prysznic-walk-in': [1.2, 0.9, 2.0], 'prysznic-walk-in-prawy': [1.2, 0.9, 2.0],
+    'tafla-prysznic': [1.0, 0.04, 2.0], 'pralka-suszarka': [0.6, 0.62, 1.75],
+    konsola: [1.0, 0.35, 0.8], siedzisko: [1.1, 0.4, 0.46], lustro: [0.6, 0.04, 1.2], 'lustro-okragle': [0.8, 0.04, 0.8],
+    wieszak: [0.9, 0.08, 0.14], 'wieszak-stojacy': [0.5, 0.5, 1.75],
+    'kanapa-rozkladana': [1.5, 0.95, 0.85], 'krzeslo-biurowe': [0.62, 0.62, 1.1], monitor: [0.62, 0.2, 0.45], 'biurko-komputerowe': [1.5, 0.7, 1.25],
+    lozeczko: [0.66, 1.26, 0.9], 'lozko-domek': [1.0, 2.1, 1.7], 'lozko-120': [1.3, 2.1, 1.0], 'komoda-przewijak': [0.9, 0.75, 0.98],
+    'stolik-dzieciecy': [1.2, 0.6, 0.55], 'regal-zabawki': [1.2, 0.35, 0.8],
+    perkusja: [1.5, 1.3, 1.3], rower: [1.75, 0.6, 1.05], 'stojak-rowery': [1.2, 0.5, 0.45], quad: [1.15, 1.9, 1.15],
+    'lawka-sztanga': [1.8, 1.6, 1.25], atlas: [1.1, 1.5, 2.1], bieznia: [0.8, 1.7, 1.35], 'rower-stacjonarny': [0.55, 1.1, 1.3],
+    hantle: [1.0, 0.45, 0.8], mata: [1.8, 0.6, 0.015],
+    'scianka-szklana-drzwi': [2.0, 0.08, 2.7], 'scianka-szklana': [1.2, 0.06, 2.7], lamele: [2.0, 0.05, 2.7],
+    dywan: [2.4, 1.7, 0.015], 'dywan-okragly': [1.6, 1.6, 0.015], roslina: [0.5, 0.5, 1.2], 'regal-magazynowy': [1.0, 0.4, 2.0],
+  };
+  const SECOND = ['second', 'second-dark', 'second-light'];
+  const matsOf = (t) => new Set(buildParts(t, t.size.w, t.size.d, t.size.h).map((p) => p.mat));
+
+  it('wszystkie nowe typy istnieją i mają umówione wymiary domyślne', () => {
+    for (const [id, [w, d, h]] of Object.entries(NEW_TYPES)) {
+      const t = getType(id);
+      expect(t, id).toBeTruthy();
+      expect(t.size, id).toEqual({ w, d, h });
+    }
+  });
+
+  it('ścianka szklana z drzwiami: pełna wysokość parteru, szerokość 1–4 m, cienka, ze szkłem i czarną ramą', () => {
+    const t = getType('scianka-szklana-drzwi');
+    expect(t.size.h).toBe(house.levels[0].ceilingHeight);
+    expect(t.range.w).toEqual([1.0, 4.0]);
+    expect(t.range.d[0]).toBeGreaterThanOrEqual(0.06);
+    expect(t.range.d[1]).toBeLessThanOrEqual(0.1);
+    expect(t.color).toBe('#2e3033');
+    for (const w of [1.0, 2.0, 4.0]) {
+      const parts = buildParts(t, w, 0.08, 2.7);
+      const glass = parts.filter((p) => p.mat === 'glass');
+      expect(glass).toHaveLength(1); // jedna tafla – mało przezroczystych warstw na telefonie
+      expect(glass[0].max[0] - glass[0].min[0]).toBeGreaterThan(w - 0.1);
+      expect(parts.filter((p) => p.mat === 'steel')).toHaveLength(2); // pochwyty obu skrzydeł
+      // styk skrzydeł dokładnie pośrodku
+      expect(parts.some((p) => p.mat === 'main' && Math.abs(p.min[0] + p.max[0]) < 1e-9 && p.max[0] - p.min[0] < 0.1 && p.min[2] < 0.05)).toBe(true);
+    }
+    // stałe pola po bokach pojawiają się dopiero przy szerokiej ściance
+    expect(buildParts(t, 4, 0.08, 2.7).length).toBeGreaterThan(buildParts(t, 1.6, 0.08, 2.7).length);
+    for (const id of ['scianka-szklana', 'tafla-prysznic', 'prysznic-walk-in']) expect(matsOf(getType(id)).has('glass'), id).toBe(true);
+  });
+
+  it('każdy slot koloru jest znany; typy dwukolorowe mają color2 i dwie nazwy, jednokolorowe nie używają slotu „second”', () => {
+    for (const t of CATALOG) {
+      const mats = matsOf(t);
+      for (const m of mats) expect(['main', 'dark', 'light', ...SECOND, ...Object.keys(FIXED_COLORS)], `${t.id}: ${m}`).toContain(m);
+      const usesSecond = SECOND.some((m) => mats.has(m));
+      expect(usesSecond, `${t.id}: slot second ↔ color2`).toBe(t.color2 !== undefined);
+      if (t.color2 !== undefined) {
+        expect(t.color2, t.id).toMatch(/^#[0-9a-f]{6}$/);
+        expect(t.colorNames, t.id).toHaveLength(2);
+        for (const n of t.colorNames) expect(typeof n === 'string' && n.length > 0, t.id).toBe(true);
+      }
+    }
+    for (const hex of Object.values(FIXED_COLORS)) expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+    // drewniane blaty kuchni i wyspy: blat to drugi kolor, domyślnie ciepły dąb
+    for (const id of ['kuchnia-dolna', 'kuchnia-zlew', 'kuchnia-plyta', 'kuchnia-wyspa', 'wyspa-barek']) {
+      const t = getType(id);
+      expect(t.color2, id).toBe('#b5895a');
+      const top = buildParts(t, t.size.w, t.size.d, t.size.h).filter((p) => p.mat === 'second' && p.max[0] - p.min[0] > t.size.w - 1e-9 && p.max[1] - p.min[1] > t.size.d - 1e-9);
+      expect(top.length, `${id}: blat na cały rzut`).toBe(1);
+    }
+  });
+
+  it('slotColor / secondColorOf: drugi kolor mebla, domyślny typu, a bez obu – kolor główny', () => {
+    expect(slotColor('second', '#112233', '#b5895a')).toBe('#b5895a');
+    expect(slotColor('second', '#112233')).toBe('#112233');
+    expect(slotColor('second', '#112233', 'zielony')).toBe('#112233');
+    expect(slotColor('second-dark', '#112233', '#B5895A')).toBe(tint('#b5895a', 0.74));
+    expect(slotColor('second-light', '#112233', '#b5895a')).toBe(tint('#b5895a', 1.45));
+    expect(slotColor('wood', '#112233')).toBe(FIXED_COLORS.wood);
+    expect(slotColor('main', '#112233', '#b5895a')).toBe('#112233');
+    expect(secondColorOf({ type: 'wyspa-barek' })).toBe('#b5895a');
+    expect(secondColorOf({ type: 'wyspa-barek', color2: '#C2704F' })).toBe('#c2704f');
+    expect(secondColorOf({ type: 'wyspa-barek', color2: 'x' })).toBe('#b5895a');
+    expect(secondColorOf({ type: 'sofa-3' })).toBeUndefined();
+  });
+
+  it('kształty obrotowe i belki: walce leżące są okrągłe, końce belki leżą w jej prostopadłościanie opisanym', () => {
+    const seen = new Set();
+    for (const t of CATALOG) {
+      for (const size of [t.size, { w: t.range.w[0], d: t.range.d[0], h: t.range.h[0] }, { w: t.range.w[1], d: t.range.d[1], h: t.range.h[1] }]) {
+        for (const p of buildParts(t, size.w, size.d, size.h)) {
+          seen.add(p.shape);
+          const [dx, dy, dz] = [0, 1, 2].map((i) => p.max[i] - p.min[i]);
+          if (p.shape === 'cylX') expect(dy, t.id).toBeCloseTo(dz, 9);
+          if (p.shape === 'cylY' && t.id !== 'lustro-okragle') expect(dx, t.id).toBeCloseTo(dz, 9);
+          if (p.shape === 'beam') {
+            expect(p.t, t.id).toBeGreaterThan(0);
+            for (const end of [p.from, p.to]) for (let i = 0; i < 3; i++) {
+              expect(end[i], t.id).toBeGreaterThanOrEqual(p.min[i] - 1e-9);
+              expect(end[i], t.id).toBeLessThanOrEqual(p.max[i] + 1e-9);
+            }
+          }
+        }
+      }
+    }
+    expect([...seen].sort()).toEqual([...SHAPES].sort()); // każdy kształt jest gdzieś użyty
+  });
+
+  it('meble wiszące mają wysokość zawieszenia w zakresie, a dywany i maty są płaskie', () => {
+    for (const id of ['lustro', 'lustro-okragle', 'wieszak', 'polka-wiszaca', 'monitor', 'kuchnia-gorna']) {
+      const t = getType(id);
+      expect(t.mount, id).toBeGreaterThanOrEqual(MOUNT_RANGE[0]);
+      expect(t.mount + t.size.h, id).toBeLessThanOrEqual(house.levels[0].ceilingHeight);
+    }
+    expect(CATALOG.filter((t) => t.mount !== undefined).map((t) => t.id).sort()).toEqual(['kuchnia-gorna', 'lustro', 'lustro-okragle', 'monitor', 'polka-wiszaca', 'wieszak']);
+    for (const id of ['dywan', 'dywan-okragly', 'mata']) {
+      const t = getType(id);
+      expect(t.range.h[1], id).toBeLessThanOrEqual(0.05); // nie zasłania mebli stojących na nim
+      expect(t.mount, id).toBeUndefined();
+    }
+    expect(getType('monitor').mount).toBe(getType('biurko').size.h); // staje na blacie zwykłego biurka
+  });
+
+  it('dywan pod meblami nie przeszkadza w ustawianiu: meble kolidują tylko ze ścianami', () => {
+    const walls = wallsOf('parter');
+    const rug = { x: 11, y: 7, rot: 0, ...getType('dywan').size };
+    const table = { x: 11, y: 7, rot: 0, ...getType('stolik-okragly').size };
+    expect(collides(rug, walls)).toBe(false);
+    expect(collides(table, walls)).toBe(false); // ten sam środek co dywan
+    const moved = moveItem(table, { ...table, x: 11.6 }, walls);
+    expect(moved.blocked).toBe(false);
+    expect(moved.x).toBeCloseTo(11.6, 3);
+  });
+
+  it('kominek startowy: obudowa z ławą, czarnym wkładem i belką mieści się w obrysie z projektu', () => {
+    const start = createStarterFurniture().find((f) => f.type === 'kominek');
+    const parts = buildParts(getType('kominek'), start.w, start.d, start.h);
+    const beam = parts.find((p) => p.mat === 'second');
+    const insert = parts.find((p) => p.mat === 'black');
+    expect(beam.max[0] - beam.min[0]).toBeCloseTo(start.w, 9); // belka na całą szerokość
+    expect(beam.min[2]).toBeGreaterThan(insert.max[2]); // nad wkładem
+    expect(insert.min[1]).toBeLessThan(-start.d / 2 + 0.05); // wkład od frontu
+    expect(parts.some((p) => p.mat === 'fire')).toBe(true);
+    expect(Math.max(...parts.map((p) => p.max[2]))).toBeCloseTo(start.h, 9);
+  });
+
+  it('model 3D: każdy typ buduje siatki ze wspólnych geometrii, a materiały są zwalniane', () => {
+    const factory = createModelFactory(THREE);
+    const geometries = new Set();
+    for (const t of CATALOG) {
+      const root = new THREE.Group();
+      const item = { id: t.id, type: t.id, ...t.size, color: t.color };
+      factory.fill(root, item);
+      const parts = buildParts(t, t.size.w, t.size.d, t.size.h);
+      expect(root.children.length, t.id).toBe(parts.length);
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      // siatki nie wychodzą poza wymiary mebla (belki skośne: z dokładnością do połowy przekroju)
+      const slack = 0.03;
+      expect(box.min.x, t.id).toBeGreaterThanOrEqual(-t.size.w / 2 - slack);
+      expect(box.max.x, t.id).toBeLessThanOrEqual(t.size.w / 2 + slack);
+      expect(box.min.y, t.id).toBeGreaterThanOrEqual(-t.size.d / 2 - slack);
+      expect(box.max.y, t.id).toBeLessThanOrEqual(t.size.d / 2 + slack);
+      expect(box.min.z, t.id).toBeGreaterThanOrEqual(-slack);
+      expect(box.max.z, t.id).toBeLessThanOrEqual(t.size.h + slack);
+      expect(box.max.z, t.id).toBeGreaterThan(t.size.h - slack);
+      for (const mesh of root.children) {
+        geometries.add(mesh.geometry);
+        expect(Number.isFinite(mesh.matrix.elements.reduce((a, v) => a + v, 0)), t.id).toBe(true);
+        if (mesh.material.transparent) expect(mesh.material.depthWrite).toBe(false);
+      }
+      if (t.color2) {
+        // własny drugi kolor mebla zmienia materiał slotu „second”
+        const before = new Set(root.children.map((m) => m.material.color.getHexString()));
+        factory.fill(root, { ...item, color2: '#123456' });
+        const after = new Set(root.children.map((m) => m.material.color.getHexString()));
+        expect(before.has(t.color2.slice(1)), t.id).toBe(true);
+        expect(after.has('123456'), t.id).toBe(true);
+      }
+      factory.clear(root);
+      expect(root.children.length).toBe(0);
+    }
+    expect(geometries.size).toBeLessThanOrEqual(6); // sześcian, 3 walce, rura, kula – wspólne dla wszystkich mebli
+    expect(factory.materialCount).toBe(0);
+    // trójkąty: najcięższy mebel katalogu jest wciąż lekki
+    const tri = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
+    for (const g of geometries) expect(tri(g)).toBeLessThanOrEqual(200);
+    factory.dispose();
+  });
+
+  it('drugi kolor przechodzi przez walidację wariantu i przez link udostępniania', () => {
+    const raw = { id: 'a', type: 'wyspa-barek', levelId: 'parter', x: 9, y: 6, rot: 0, w: 1.8, d: 0.9, h: 0.92, color: '#ddd2bf', color2: '#b5895a' };
+    const ctx = { levelIds: ['parter'], makeId: () => 'nowy' };
+    expect(sanitizeFurnitureItem(raw, ctx)).toEqual(raw);
+    const variant = { id: 'w', name: 'Montana', finishes: {}, furniture: [raw, { ...raw, id: 'b', type: 'lustro', color2: undefined, z: 0.6 }], customMaterials: [] };
+    const back = expandVariant(JSON.parse(JSON.stringify(compactVariant(variant))));
+    expect(back.furniture[0]).toEqual(raw);
+    expect(back.furniture[1].z).toBe(0.6);
+    expect('color2' in back.furniture[1]).toBe(false);
   });
 });
 

@@ -437,3 +437,101 @@ describe('rdzeń – widoki', () => {
     await frame();
   });
 });
+
+// ---------------------------------------------------------------- opcje bryły (design.json)
+describe('rdzeń – opcje bryły z design.json', () => {
+  const design = JSON.parse(readFileSync(join(root, 'design.json'), 'utf8'));
+  let app2;
+  const meshes = () => app2.internals.built.group.children;
+  const beam = () => meshes().find((m) => m.name === 'poddasze:ceiling:beam');
+  const OPEN_WALL = 'poddasze:1/9:wall:5'; // ściana szczytowa sypialni – sięga pod kalenicę
+
+  beforeAll(async () => {
+    const host = document.createElement('div');
+    host.innerHTML = '<div id="app2"><canvas id="scena2"></canvas><div id="ui2"></div></div>';
+    document.body.append(host);
+    const container = document.getElementById('app2');
+    const canvas2 = document.getElementById('scena2');
+    Object.defineProperty(container, 'clientWidth', { value: W });
+    Object.defineProperty(container, 'clientHeight', { value: H });
+    canvas2.getBoundingClientRect = () => ({ left: 0, top: 0, width: W, height: H, right: W, bottom: H });
+    const { createApp } = await import('../src/app/app.js');
+    app2 = createApp({ house, design, container, canvas: canvas2, uiRoot: document.getElementById('ui2') });
+    app2.start();
+    await frame();
+  });
+
+  it('app.design: bez design pusty obiekt i bryła z projektu, z design – zmienione powierzchnie', () => {
+    expect(app.design).toEqual({});
+    expect(app.getSurface('poddasze:1/9:ceiling')).toBeTruthy();
+    expect(app.getSurface('poddasze:1/9:slope-N')).toBeUndefined();
+    expect(app.internals.built.group.children.some((m) => /:(beam|slat|stairTread)$/.test(m.name))).toBe(false);
+
+    expect(app2.design).toBe(design);
+    for (const id of ['1/9', '1/10', '1/11']) expect(app2.getSurface(`poddasze:${id}:ceiling`), id).toBeUndefined();
+    expect(app2.surfacesOfRoom('poddasze', '1/9').filter((s) => s.kind === 'slope').map((s) => s.id).sort()).toEqual(['poddasze:1/9:slope-N', 'poddasze:1/9:slope-S']);
+    expect(app2.getSurface('poddasze:1/8:ceiling')).toBeTruthy(); // strych nad pozostałymi pomieszczeniami bez zmian
+    expect(app2.collision.ceilingAt('poddasze', 2.0, 5.05)).toBeCloseTo(1.425 + 0.7 * 4.8, 9);
+    expect(app.collision.ceilingAt('poddasze', 2.0, 5.05)).toBeCloseTo(2.55, 9);
+    expect(meshes().some((m) => m.name === 'parter:stairs:slat')).toBe(true);
+    expect(meshes().some((m) => m.name === 'parter:stairs:balustrade')).toBe(false);
+  });
+
+  it('domek dla lalek: belki, skosy i część ścian ponad dawnym sufitem znikają razem z sufitami', () => {
+    app2.store.setState({ viewMode: 'orbit', levelId: 'poddasze', showRoof: false });
+    const wall = app2.getSurface(OPEN_WALL).mesh;
+    expect(wall.userData.headerStart).toBeGreaterThan(0);
+    expect(beam().visible).toBe(false);
+    expect(app2.getSurface('poddasze:1/9:slope-N').mesh.visible).toBe(false);
+    expect(wall.visible).toBe(true);
+    expect(wall.geometry.drawRange.count).toBe(wall.userData.headerStart);
+    // widoczna część ściany kończy się na wysokości dawnego sufitu – jak ściany pozostałych pomieszczeń i czapki murów
+    const p = wall.geometry.attributes.position;
+    let top = -Infinity;
+    for (let i = 0; i < wall.userData.headerStart; i++) top = Math.max(top, p.getZ(i));
+    expect(top).toBeCloseTo(3.03 + 2.55, 5);
+
+    // parter jako domek dla lalek: lamele widoczne, poddasze (z belkami) ukryte
+    app2.store.setState({ levelId: 'parter' });
+    expect(meshes().find((m) => m.name === 'parter:stairs:slat').visible).toBe(true);
+    expect(beam().visible).toBe(false);
+  });
+
+  it('dach włączony i spacer: pełne ściany do skosu, belki widoczne', () => {
+    app2.store.setState({ viewMode: 'orbit', levelId: 'all', showRoof: true });
+    const wall = app2.getSurface(OPEN_WALL).mesh;
+    expect(wall.geometry.drawRange.count).toBe(Infinity);
+    expect(beam().visible).toBe(true);
+    expect(meshes().filter((m) => m.userData.part !== 'cap').every((m) => m.visible)).toBe(true);
+
+    app2.store.setState({ viewMode: 'walk', levelId: 'poddasze' });
+    expect(wall.geometry.drawRange.count).toBe(Infinity);
+    expect(beam().visible).toBe(true);
+    expect(app2.getSurface('poddasze:1/9:slope-S').mesh.visible).toBe(true);
+    const walk = app2.internals.views.walk;
+    // pod kalenicą w sypialni oczy na pełnej wysokości, pod skosem przy ściance kolankowej w łazience 1/10 – niżej
+    walk.teleport({ x: 2.0, y: 5.05, z: 3.03 });
+    expect(app2.camera.position.y).toBeCloseTo(3.03 + 1.6, 6);
+    walk.teleport({ x: 1.0, y: 9.6, z: 3.03 });
+    expect(app2.camera.position.y).toBeCloseTo(3.03 + 1.425 + 0.7 * 0.25 - 0.12, 6);
+    // miejsce „skocz do pomieszczenia” leży w sypialni
+    expect(app2.focusRoom('1/9', 'poddasze')).toBe(true);
+    const here = walk.getPosition();
+    expect(app2.collision.pointInRoom('poddasze', here.x, here.y)).toBe('1/9');
+  });
+
+  it('widok z góry (przekrój 1,20 m): sufity, skosy i belki ukryte, ściany przycięte', () => {
+    app2.store.setState({ viewMode: 'top', levelId: 'poddasze' });
+    expect(beam().visible).toBe(false);
+    expect(meshes().filter((m) => m.userData.part === 'ceiling').some((m) => m.visible)).toBe(false);
+    const wall = app2.getSurface(OPEN_WALL).mesh;
+    expect(wall.visible).toBe(true);
+    expect(wall.geometry.drawRange.count).toBe(wall.userData.headerStart);
+    expect(app2.getSurface('poddasze:1/9:floor').mesh.visible).toBe(true);
+    // nowe materiały stałe też są podpięte pod przekrój
+    for (const name of ['parter:stairs:slat', 'parter:stairs:stairTread', 'parter:stairs:stairRiser', 'poddasze:ceiling:beam']) {
+      expect(meshes().find((m) => m.name === name).material.clippingPlanes, name).toBe(app2.clippingPlanes);
+    }
+    app2.store.setState({ viewMode: 'orbit', levelId: 'parter', showRoof: false });
+  });
+});

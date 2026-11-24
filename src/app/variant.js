@@ -26,6 +26,7 @@
  * @property {number} h      wysokość (m)
  * @property {string} color
  * @property {number} [z]    opcjonalnie: wysokość spodu nad posadzką (m) – meble wiszące (funkcja mebli)
+ * @property {string} [color2]  opcjonalnie: drugi kolor '#rrggbb' mebli dwukolorowych (np. blat przy frontach); brak = domyślny typu
  *
  * @typedef {{id: string, name: string, dataUrl: string, size: [number, number]}} CustomMaterial   size [szer., wys.] w metrach
  *

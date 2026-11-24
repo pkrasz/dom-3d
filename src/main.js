@@ -1,6 +1,8 @@
-// Start aplikacji: wczytuje house.json, buduje rdzeń i uruchamia funkcje z src/features/*.
+// Start aplikacji: wczytuje house.json (geometria z projektu) i design.json (opcje bryły – odstępstwa od projektu),
+// buduje rdzeń i uruchamia funkcje z src/features/*.
 import './ui/styles.css';
 import house from '../house.json';
+import design from '../design.json';
 import { createApp } from './app/app.js';
 import { init as initFinishes } from './features/finishes/index.js';
 import { init as initFurniture } from './features/furniture/index.js';
@@ -11,7 +13,7 @@ const canvas = document.getElementById('scena');
 const uiRoot = document.getElementById('ui');
 
 try {
-  const app = createApp({ house, container, canvas, uiRoot });
+  const app = createApp({ house, design, container, canvas, uiRoot });
 
   // Kolejność: warianty (wczytanie zapisanego stanu) → wykończenia → meble.
   // Błąd jednej funkcji nie może zatrzymać modelu.
