@@ -71,9 +71,15 @@ Dla ścian, kominów i skosów jest przełącznik „Cała ściana / Płytki do 
 
 ### Warianty, eksport, import
 
-Przycisk z nazwą wariantu otwiera panel „Warianty”: lista (przełączanie, zmiana nazwy, usuwanie – ostatniego nie da się usunąć), „Pusty z meblami z projektu”, „Kopia bieżącego”, „Eksportuj bieżący”, „Eksportuj wszystkie”, „Importuj z pliku…”.
+Przycisk z nazwą wariantu otwiera panel „Warianty”: lista (przełączanie, zmiana nazwy, usuwanie – ostatniego nie da się usunąć), „Pusty z meblami z projektu”, „Kopia bieżącego”, „Udostępnij”, „Wyślij plik”, „Wklej link…”, „Eksportuj bieżący”, „Eksportuj wszystkie”, „Importuj z pliku…”.
 
-Zmiany zapisują się same w `localStorage` tej przeglądarki (klucz `model3d-dom`). Plik eksportu (`dom-<nazwa>-RRRR-MM-DD.json`) służy jako kopia zapasowa i do przeniesienia na inne urządzenie. Import jednego wariantu od razu go aktywuje; paczka wariantów tylko dopisuje się do listy.
+Zmiany zapisują się same w `localStorage` tej przeglądarki (klucz `model3d-dom`). Plik eksportu (`dom-<nazwa>-RRRR-MM-DD.json`) służy jako kopia zapasowa. Import jednego wariantu od razu go aktywuje; paczka wariantów tylko dopisuje się do listy.
+
+**Wysyłanie wariantu na inny telefon.** „Udostępnij” tworzy link z całym aktywnym wariantem (wykończenia i meble) i otwiera systemowe udostępnianie (albo kopiuje link do schowka). Odbiorca otwiera link, widzi pytanie „Dodać wariant «nazwa»?” i po „Dodaj i otwórz” ma go u siebie jako nowy wariant – jego własne warianty zostają bez zmian. To kopia: późniejsze zmiany trzeba wysłać ponownie, a ten sam link otwarty drugi raz doda kolejną kopię z dopiskiem „(2)”. Każdy, kto ma link, zobaczy ten wariant. Wariant z własnymi zdjęciami płytek (albo wyjątkowo duży) nie mieści się w linku – wtedy „Wyślij plik” i u odbiorcy „Importuj z pliku…”.
+
+Link dodaje wariant w tej przeglądarce, w której się otworzył. Jeśli odbiorca używa ikony na ekranie telefonu (na iPhonie ma ona osobną pamięć niż Safari) albo link otworzył się w oknie komunikatora: skopiować link z wiadomości i w aplikacji wybrać Warianty → „Wklej link…”.
+
+Technicznie: wariant jest zakodowany we fragmencie adresu (`#w=1.z.<dane>`, `features/variants/share.js`), więc nie trafia na żaden serwer; limit to 6000 znaków całego adresu, a dane mają sumę kontrolną (przekłamany link jest odrzucany). Dane z linku przechodzą tę samą walidację co plik importu.
 
 ## Jak dodać nowy materiał
 
@@ -257,7 +263,7 @@ src/
   features/
     finishes/         wykończenia: library.js, palette.js (dane), textures.js, finish.js, apply.js, panel.js…
     furniture/        meble: catalog.js, starter.js (dane), placement.js, model.js, scene.js, panel.js
-    variants/         warianty: controller.js, storage.js, validate.js, io.js, panel.js
+    variants/         warianty: controller.js, storage.js, validate.js, io.js, panel.js, share.js (link), receive.js
 tools/                check.mjs, preview2d.mjs, geometry.mjs
 tests/                testy vitest
 preview/              wygenerowane podglądy 2D i podkłady z rysunków
@@ -332,7 +338,7 @@ Aplikacja to statyczna strona: po `npm run build` cały serwis leży w katalogu 
 Dwie rzeczy, o których warto pamiętać:
 
 - **Adres jest publiczny.** Każdy, kto zna link, zobaczy rzuty i wymiary domu. Nie ma w nich adresu ani danych osobowych (nazwę w nagłówku ustawia `house.json` → `meta.name`), ale linku nie warto rozsyłać szerzej niż trzeba.
-- **Warianty zapisują się w przeglądarce, osobno dla każdego adresu i urządzenia.** To, co ustawisz na komputerze pod `localhost`, nie pojawi się samo w telefonie. Przenosisz je plikiem: Warianty → „Eksportuj wszystkie” na jednym urządzeniu, „Importuj z pliku…” na drugim.
+- **Warianty zapisują się w przeglądarce, osobno dla każdego adresu i urządzenia.** To, co ustawisz na jednym urządzeniu, nie pojawi się samo na drugim. Wariant wysyłasz linkiem: Warianty → „Udostępnij”, a odbiorca otwiera link i potwierdza dodanie (w aplikacji z ikony na ekranie telefonu: Warianty → „Wklej link…”). Link działa między urządzeniami otwierającymi ten sam adres strony. Plik („Wyślij plik” / „Eksportuj wszystkie” → „Importuj z pliku…”) zostaje jako zapas: dla wariantów z własnymi zdjęciami płytek i do przeniesienia wszystkich wariantów naraz.
 
 ### A. W domu, przez Wi‑Fi (bez publikacji)
 
@@ -427,4 +433,4 @@ jobs:
 
 ### Ikona na ekranie głównym telefonu
 
-Po otwarciu adresu w telefonie: iPhone (Safari) → Udostępnij → „Do ekranu początkowego”; Android (Chrome) → menu ⋮ → „Dodaj do ekranu głównego”. Strona otwiera się wtedy na pełnym ekranie, ale nadal potrzebuje internetu (nie działa offline).
+Po otwarciu adresu w telefonie: iPhone (Safari) → Udostępnij → „Do ekranu początkowego”; Android (Chrome) → menu ⋮ → „Dodaj do ekranu głównego”. Strona otwiera się wtedy na pełnym ekranie, ale nadal potrzebuje internetu (nie działa offline). Na iPhonie ikona ma własną pamięć wariantów, osobną od Safari: warianty zrobione wcześniej w Safari trzeba do niej przenieść („Eksportuj wszystkie” → „Importuj z pliku…”), a link do wariantu od drugiej osoby wkleić przez Warianty → „Wklej link…”.

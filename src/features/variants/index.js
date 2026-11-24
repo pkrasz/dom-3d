@@ -6,6 +6,8 @@
 //   controller.js – lista wariantów, aktywny wariant, autozapis (bez interfejsu)
 //   io.js         – plik eksportu, nazwa pliku, pobieranie i czytanie plików
 //   panel.js      – zawartość panelu „Warianty”
+//   share.js      – wariant zakodowany w linku (#w=…): kodowanie i dekodowanie
+//   receive.js    – odbiór wariantu z linku: pytanie „Dodać wariant?”
 //
 // init(app) jest wołane PIERWSZE (przed wykończeniami i meblami): po nim app.variant.get() zwraca już wczytany wariant.
 import './variants.css';
@@ -13,6 +15,7 @@ import { createStarterFurniture } from '../furniture/starter.js';
 import { createStorage } from './storage.js';
 import { createController, defaultMakeId } from './controller.js';
 import { createVariantsPanel, ICONS } from './panel.js';
+import { createShareReceiver } from './receive.js';
 
 /**
  * @param {import('../../app/app.js').App} app
@@ -21,6 +24,10 @@ import { createVariantsPanel, ICONS } from './panel.js';
  * @param {() => string} [deps.makeId]     domyślnie crypto.randomUUID
  * @param {() => Date} [deps.now]          domyślnie bieżący czas
  * @param {(filename: string, text: string) => void} [deps.download]
+ * @param {Window} [deps.win]              okno z adresem strony (link do wariantu, 'hashchange')
+ * @param {?Object} [deps.nav]             navigator (udostępnianie, schowek)
+ * @param {() => string} [deps.baseUrl]    adres strony do linków
+ * @param {() => Promise<void>} [deps.defer]  na co czekać przed pytaniem o wariant z linku (domyślnie następna klatka)
  * @returns {ReturnType<typeof createController> & {openPanel: () => void, destroy: () => void}}
  */
 export function init(app, deps = {}) {
@@ -30,6 +37,7 @@ export function init(app, deps = {}) {
     makeId: deps.makeId || defaultMakeId,
     now: deps.now || (() => new Date()),
     createStarter: createStarterFurniture,
+    ...(deps.baseUrl ? { baseUrl: deps.baseUrl } : {}),
   });
 
   // ---------------------------------------------------------------- przycisk i panel
@@ -51,7 +59,12 @@ export function init(app, deps = {}) {
 
   function openPanel() {
     if (open) return;
-    const view = createVariantsPanel(controller, { toast: (text) => app.ui.toast(text, { duration: 5000 }), download: deps.download });
+    const view = createVariantsPanel(controller, {
+      toast: (text) => app.ui.toast(text, { duration: 5000 }),
+      download: deps.download,
+      ...('nav' in deps ? { nav: deps.nav } : {}),
+      pasteLink: (text) => receiver.paste(text),
+    });
     const handle = app.ui.openPanel({
       title: 'Warianty',
       content: view.element,
@@ -69,6 +82,15 @@ export function init(app, deps = {}) {
     else openPanel();
   }
 
+  // ---------------------------------------------------------------- wariant z linku (#w=…)
+  // Zapisane warianty są już wczytane (kontroler powyżej). Dekodowanie jest asynchroniczne, a pytanie czeka jeszcze
+  // na następną klatkę – pojawia się więc po init() pozostałych funkcji i po app.start(), i żadna z nich go nie zamknie.
+  const receiver = createShareReceiver(app, controller, {
+    ...(deps.win ? { win: deps.win } : {}),
+    ...(deps.defer ? { defer: deps.defer } : {}),
+  });
+  receiver.check();
+
   // ---------------------------------------------------------------- zapis przy wychodzeniu ze strony
   // 'pagehide' i przejście karty w tło to ostatnie pewne momenty na telefonie (beforeunload bywa pomijane).
   const onHide = () => controller.flush();
@@ -85,6 +107,7 @@ export function init(app, deps = {}) {
       window.removeEventListener('pagehide', onHide);
       document.removeEventListener('visibilitychange', onVisibility);
       offLabel();
+      receiver.dispose();
       if (open) open.handle.close();
       toolbarButton.remove();
       controller.dispose();

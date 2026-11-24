@@ -1,4 +1,5 @@
-// Zawartość panelu „Warianty”: lista z aktywnym wariantem, nowy / kopia, zmiana nazwy, usuwanie, eksport / import.
+// Zawartość panelu „Warianty”: lista z aktywnym wariantem, udostępnianie (link / plik), nowy / kopia, zmiana nazwy,
+// usuwanie, eksport / import.
 // Panel nie ma własnych danych – rysuje to, co zwraca controller.getState(), i woła jego operacje.
 // Zmiana nazwy i potwierdzenie usunięcia dzieją się w wierszu listy (bez okien prompt/confirm – wygodniej palcem).
 import { el } from '../../ui/dom.js';
@@ -35,9 +36,17 @@ export function statusText({ status, savedAt }) {
  * @param {(text: string) => void} deps.toast
  * @param {(filename: string, text: string) => void} [deps.download]
  * @param {(file: File) => Promise<{ok: boolean, text?: string, error?: string}>} [deps.readFile]
+ * @param {?Object} [deps.nav]   navigator (share, canShare, clipboard) – podmieniany w testach
+ * @param {(filename: string, text: string) => File} [deps.makeFile]
+ * @param {(text: string) => Promise<boolean>} [deps.pasteLink]  odbiór wklejonego linku (receive.js); brak → bez tej sekcji
  * @returns {{element: HTMLElement, dispose: () => void}}
  */
-export function createVariantsPanel(controller, { toast, download = downloadText, readFile = readFileText }) {
+export function createVariantsPanel(controller, {
+  toast, download = downloadText, readFile = readFileText,
+  nav = typeof navigator !== 'undefined' ? navigator : null,
+  makeFile = (filename, text) => new File([text], filename, { type: 'application/json' }),
+  pasteLink = null,
+}) {
   // stan samego panelu: który wiersz jest w trybie zmiany nazwy / potwierdzania usunięcia
   let editingId = null;
   let confirmId = null;
@@ -50,9 +59,59 @@ export function createVariantsPanel(controller, { toast, download = downloadText
   const iconButton = (icon, label, onClick, disabled = false) =>
     el('button', { class: 'btn btn--icon war-icon', type: 'button', 'aria-label': label, title: label, html: icon, disabled, onclick: onClick });
 
+  // ---------------------------------------------------------------- udostępnianie aktywnego wariantu
+  const shareHead = el('h3', { class: 'war-head' }, 'Udostępnij');
+  const shareBtn = button('Udostępnij', doShare, 'war-btn--primary war-share');
+  const fileBtn = button('Wyślij plik', doSendFile);
+  const shareInfo = el('p', { class: 'war-status is-warning', role: 'status', hidden: true });
+  const linkInput = el('input', {
+    class: 'war-input war-link__input', type: 'text', readonly: true, 'aria-label': 'Link do wariantu',
+    onfocus: () => linkInput.select?.(),
+  });
+  const linkBox = el('div', { class: 'war-link', hidden: true }, [
+    el('p', { class: 'war-note' }, 'Przytrzymaj link, skopiuj go i wklej w wiadomości:'),
+    linkInput,
+  ]);
+
+  // ---------------------------------------------------------------- odbiór: link wklejony ręcznie
+  // Potrzebne tam, gdzie linku nie da się otworzyć: aplikacja z ikony na ekranie początkowym iPhone'a (osobna pamięć,
+  // brak paska adresu) i sytuacja, gdy link otworzył się w przeglądarce wbudowanej w komunikator.
+  const pasteInput = el('input', {
+    class: 'war-input war-link__input', type: 'text', 'aria-label': 'Link do wariantu z wiadomości', placeholder: 'Wklej tutaj link z wiadomości',
+    autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'go',
+  });
+  const submitPaste = () => {
+    if (!pasteInput.value.trim()) return toast('Wklej link do wariantu.');
+    pasteLink(pasteInput.value); // pytanie „Dodać wariant?” otwiera się w miejscu tego panelu
+  };
+  pasteInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitPaste();
+  });
+  const pasteBox = el('div', { class: 'war-link', hidden: true }, [
+    pasteInput,
+    el('div', { class: 'war-actions' }, [button('Dodaj z linku', submitPaste, 'war-btn--primary')]),
+  ]);
+  const pasteSection = pasteLink ? [
+    el('h3', { class: 'war-head' }, 'Masz link do wariantu?'),
+    el('div', { class: 'war-actions' }, [
+      button('Wklej link…', () => {
+        pasteBox.hidden = false;
+        pasteInput.focus?.();
+      }),
+    ]),
+    pasteBox,
+    el('p', { class: 'war-note' }, 'Zwykle wystarczy stuknąć link. Jeśli używasz ikony na ekranie telefonu albo wariant się nie pojawił – skopiuj link z wiadomości i wklej go tutaj.'),
+  ] : [];
+
   const root = el('div', { class: 'war' }, [
     statusEl,
     listEl,
+    shareHead,
+    el('div', { class: 'war-actions' }, [shareBtn, fileBtn]),
+    shareInfo,
+    linkBox,
+    el('p', { class: 'war-note' }, 'Odbiorca dostaje kopię wariantu – późniejsze zmiany trzeba wysłać ponownie. Każdy, kto ma link, zobaczy ten wariant.'),
+    ...pasteSection,
     el('h3', { class: 'war-head' }, 'Nowy wariant'),
     el('div', { class: 'war-actions' }, [
       button('Pusty z meblami z projektu', () => report(controller.createFromProject())),
@@ -65,7 +124,7 @@ export function createVariantsPanel(controller, { toast, download = downloadText
       button('Importuj z pliku…', () => fileInput.click()),
     ]),
     fileInput,
-    el('p', { class: 'war-note' }, 'Warianty zapisują się same w tej przeglądarce. Plik przyda się jako kopia zapasowa i do przeniesienia na inne urządzenie.'),
+    el('p', { class: 'war-note' }, 'Warianty zapisują się same w tej przeglądarce. Plik przyda się jako kopia zapasowa.'),
   ]);
 
   function report(result) {
@@ -77,6 +136,102 @@ export function createVariantsPanel(controller, { toast, download = downloadText
       const file = controller.exportData(scope);
       download(file.filename, file.text);
       toast(scope === 'all' ? `Zapisano plik: ${plural(file.count, 'wariant', 'warianty', 'wariantów')}.` : `Zapisano plik ${file.filename}`);
+    } catch (err) {
+      console.error(err);
+      toast('Nie udało się zapisać pliku.');
+    }
+  }
+
+  const activeVariant = () => {
+    const { variants, activeId } = controller.getState();
+    return variants.find((v) => v.id === activeId);
+  };
+  const isAbort = (err) => err && err.name === 'AbortError'; // użytkownik zamknął systemowy arkusz – to nie błąd
+
+  function setShareInfo(text) {
+    shareInfo.textContent = text;
+    shareInfo.hidden = !text;
+    // gdy link nie może powstać, podpowiadamy plik: to on staje się przyciskiem głównym
+    fileBtn.classList.toggle('war-btn--primary', Boolean(text));
+    shareBtn.classList.toggle('war-btn--primary', !text);
+  }
+  function resetShare() {
+    setShareInfo('');
+    linkBox.hidden = true;
+    linkInput.value = '';
+  }
+
+  // Link liczymy z WYPRZEDZENIEM (przy otwarciu panelu i po każdej zmianie listy). Kompresja jest asynchroniczna,
+  // a Safari pozwala wywołać navigator.share tylko bezpośrednio po dotknięciu – gotowy link nie gubi tego „gestu”.
+  let prepared = null; // { variant, promise, result }
+  function prepareLink() {
+    const variant = activeVariant();
+    if (prepared && prepared.variant === variant) return prepared.promise;
+    const entry = { variant, result: null, promise: null };
+    entry.promise = controller.shareLink().then((result) => {
+      entry.result = result;
+      return result;
+    });
+    prepared = entry;
+    return entry.promise;
+  }
+
+  async function doShare() {
+    resetShare();
+    const variant = activeVariant();
+    const link = prepared && prepared.variant === variant && prepared.result ? prepared.result : await prepareLink();
+    if (!link.ok) return setShareInfo(link.message);
+    if (nav && typeof nav.share === 'function') {
+      try {
+        await nav.share({ title: link.title, text: link.text, url: link.url });
+        return;
+      } catch (err) {
+        if (isAbort(err)) return;
+        // inny błąd (np. przeglądarka odmówiła) → próbujemy schowka
+      }
+    }
+    if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+      try {
+        await nav.clipboard.writeText(link.url);
+        toast('Link skopiowany');
+        return;
+      } catch {
+        // brak zgody na schowek → pole do ręcznego skopiowania
+      }
+    }
+    linkInput.value = link.url;
+    linkBox.hidden = false;
+    linkInput.focus?.();
+    linkInput.select?.();
+  }
+
+  async function doSendFile() {
+    resetShare();
+    let file;
+    try {
+      file = controller.exportData('active'); // ten sam format co „Eksportuj bieżący”
+    } catch (err) {
+      console.error(err);
+      return toast('Nie udało się przygotować pliku.');
+    }
+    let shareable = null;
+    try {
+      const candidate = makeFile(file.filename, file.text);
+      if (nav && typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: [candidate] })) shareable = candidate;
+    } catch {
+      // brak File / canShare → zwykłe pobranie
+    }
+    if (shareable) {
+      try {
+        await nav.share({ files: [shareable], title: file.filename });
+        return;
+      } catch (err) {
+        if (isAbort(err)) return;
+      }
+    }
+    try {
+      download(file.filename, file.text);
+      toast(`Zapisano plik ${file.filename} – wyślij go jako załącznik.`);
     } catch (err) {
       console.error(err);
       toast('Nie udało się zapisać pliku.');
@@ -185,6 +340,10 @@ export function createVariantsPanel(controller, { toast, download = downloadText
     } else {
       listEl.replaceChildren(...rows);
     }
+    const active = variants.find((v) => v.id === activeId);
+    shareHead.textContent = active ? `Udostępnij: ${active.name}` : 'Udostępnij';
+    if (!prepared || prepared.variant !== active) resetShare(); // inny wariant → stary komunikat i link są nieaktualne
+    prepareLink();
   }
 
   function renderStatus() {

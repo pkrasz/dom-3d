@@ -7,9 +7,10 @@
 //  - Pozostałe funkcje (wykończenia, meble) nic o liście nie wiedzą – dostają 'variant:change' z pełnym wariantem.
 import { cloneVariant } from '../../app/variant.js';
 import {
-  CURRENT_VERSION, LIMITS, cleanName, parseImport, parseStoredState, resolveCollisions, sanitizeFurnitureList, uniqueId, uniqueName,
+  APP_ID, CURRENT_VERSION, LIMITS, cleanName, parseImport, parseStoredState, resolveCollisions, sanitizeFurnitureList, uniqueId, uniqueName,
 } from './validate.js';
 import { buildExport, exportFileName, plural } from './io.js';
+import { SHARE_MESSAGES, createShareLink, decodeShare } from './share.js';
 
 const SAVE_DELAY_MS = 400;
 
@@ -20,6 +21,12 @@ const MESSAGES = {
   newer: 'Zapisane warianty pochodzą z nowszej wersji aplikacji. Nie zostały wczytane ani nadpisane – odśwież stronę. Bieżące zmiany nie będą zapisywane.',
   corrupt: 'Zapisane warianty były uszkodzone – zaczynamy od nowego wariantu.',
 };
+
+/** Adres strony bez fragmentu i parametrów – aplikacja działa w podkatalogu, więc ścieżka jest częścią adresu. */
+export function defaultBaseUrl() {
+  const l = globalThis.location;
+  return l ? `${l.origin}${l.pathname}` : '';
+}
 
 /** Domyślny generator id: crypto.randomUUID działa tylko po https/localhost, stąd wariant zapasowy. */
 export function defaultMakeId() {
@@ -42,8 +49,13 @@ export function defaultMakeId() {
  * @param {() => Date} [deps.now]
  * @param {() => Object[]} [deps.createStarter]   meble startowe z projektu (FurnitureItem[])
  * @param {number} [deps.saveDelay]
+ * @param {() => string} [deps.baseUrl]           adres strony do linków „Udostępnij” (bez fragmentu)
+ * @param {Object} [deps.streams]                 CompressionStream / DecompressionStream (podmieniane w testach)
  */
-export function createController(app, { storage, makeId = defaultMakeId, now = () => new Date(), createStarter = () => [], saveDelay = SAVE_DELAY_MS }) {
+export function createController(app, {
+  storage, makeId = defaultMakeId, now = () => new Date(), createStarter = () => [], saveDelay = SAVE_DELAY_MS,
+  baseUrl = defaultBaseUrl, streams = globalThis,
+}) {
   const toast = (text) => app.ui.toast(text, { duration: 7000 });
   const levelIds = app.house.levels.map((l) => l.id);
   // własny zapis: bez przycinania do bieżących powierzchni; import: tylko powierzchnie istniejące w tym domu
@@ -172,6 +184,15 @@ export function createController(app, { storage, makeId = defaultMakeId, now = (
   const full = () => variants.length >= LIMITS.variants;
   const fullMessage = `Można mieć najwyżej ${LIMITS.variants} wariantów – usuń któryś, żeby dodać nowy.`;
 
+  /** Dopisek do komunikatu po imporcie / odbiorze linku: co walidacja pominęła. */
+  function reportParts(r) {
+    const parts = [];
+    if (r.skippedSurfaces) parts.push(`Pominięto ${plural(r.skippedSurfaces, 'wykończenie', 'wykończenia', 'wykończeń')} powierzchni, których nie ma w tym domu.`);
+    const dropped = r.droppedFinishes + r.droppedFurniture + r.droppedMaterials;
+    if (dropped) parts.push(`Odrzucono ${plural(dropped, 'błędny element', 'błędne elementy', 'błędnych elementów')}.`);
+    return parts;
+  }
+
   const api = {
     /** @returns {{activeId: string, variants: Object[], savedAt: ?string, status: SaveStatus}} */
     getState: () => ({ activeId, variants: [...variants], savedAt, status }),
@@ -259,11 +280,8 @@ export function createController(app, { storage, makeId = defaultMakeId, now = (
         return { ok: false, message: `Po imporcie byłoby ponad ${LIMITS.variants} wariantów – usuń zbędne i spróbuj ponownie.` };
       }
       const incoming = resolveCollisions(variants, parsed.variants, makeId);
-      const parts = [`Zaimportowano ${plural(incoming.length, 'wariant', 'warianty', 'wariantów')}.`];
       const r = parsed.report;
-      if (r.skippedSurfaces) parts.push(`Pominięto ${plural(r.skippedSurfaces, 'wykończenie', 'wykończenia', 'wykończeń')} powierzchni, których nie ma w tym domu.`);
-      const dropped = r.droppedFinishes + r.droppedFurniture + r.droppedMaterials;
-      if (dropped) parts.push(`Odrzucono ${plural(dropped, 'błędny element', 'błędne elementy', 'błędnych elementów')}.`);
+      const parts = [`Zaimportowano ${plural(incoming.length, 'wariant', 'warianty', 'wariantów')}.`, ...reportParts(r)];
 
       if (incoming.length === 1) {
         app.variant.set(incoming[0]);
@@ -273,6 +291,55 @@ export function createController(app, { storage, makeId = defaultMakeId, now = (
         notify('list');
       }
       return { ok: true, message: parts.join(' '), count: incoming.length, report: r, ids: incoming.map((v) => v.id) };
+    },
+
+    // ---------------------------------------------------------------------------------------- udostępnianie linkiem
+    /**
+     * Link do aktywnego wariantu (cały wariant zakodowany we fragmencie adresu). Nigdy nie rzuca wyjątku.
+     * Brak linku (własne zdjęcia płytek, za długi adres) → { ok: false, reason, message } – wtedy zostaje plik.
+     * @returns {Promise<{ok: true, url: string, title: string, text: string} | {ok: false, reason: string, message: string}>}
+     */
+    async shareLink() {
+      try {
+        const variant = app.variant.get();
+        const link = await createShareLink(variant, { baseUrl: baseUrl(), streams });
+        if (!link.ok) return link;
+        return { ok: true, url: link.url, title: `Wariant domu: ${variant.name}`, text: `Wariant „${variant.name}” – model 3D domu` };
+      } catch {
+        return { ok: false, reason: 'failed', message: SHARE_MESSAGES.failed };
+      }
+    },
+
+    /**
+     * Czyta wariant z danych linku (tekst po '#w='). Niczego nie zmienia w stanie i nigdy nie rzuca wyjątku.
+     * Link to dane z zewnątrz, więc po zdekodowaniu przechodzi przez TĘ SAMĄ walidację co plik importu.
+     * @returns {Promise<{ok: true, variant: Object, report: Object} | {ok: false, message: string}>}
+     */
+    async readShared(payload) {
+      try {
+        const decoded = await decodeShare(payload, { streams });
+        if (!decoded.ok) return { ok: false, message: decoded.message };
+        const text = JSON.stringify({ app: APP_ID, version: decoded.dataVersion, variants: [decoded.variant] });
+        const parsed = parseImport(text, importCtx());
+        if (!parsed.ok || parsed.variants.length !== 1) return { ok: false, message: SHARE_MESSAGES.damaged };
+        return { ok: true, variant: parsed.variants[0], report: parsed.report };
+      } catch {
+        return { ok: false, message: SHARE_MESSAGES.damaged };
+      }
+    },
+
+    /**
+     * Dodaje wariant odczytany przez readShared jako NOWY i aktywny (kolizja id → nowy id, kolizja nazwy → dopisek).
+     * Istniejących wariantów nie rusza. Wołać dopiero po zgodzie użytkownika.
+     * @param {Object} variant  wariant z readShared
+     * @param {Object} [report] raport walidacji z readShared (do komunikatu)
+     */
+    addShared(variant, report = null) {
+      if (full()) return { ok: false, message: fullMessage };
+      const [added] = resolveCollisions(variants, [cloneVariant(variant)], makeId);
+      app.variant.set(added);
+      const parts = [`Dodano wariant «${added.name}».`, ...(report ? reportParts(report) : [])];
+      return { ok: true, id: added.id, name: added.name, message: parts.join(' ') };
     },
 
     flush,

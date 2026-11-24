@@ -698,3 +698,452 @@ describe('init(app) – całość z przyciskiem na pasku', () => {
     expect(app.buttons[0].removed).toBe(true);
   });
 });
+
+// ================================================================================================ udostępnianie
+describe('udostępnianie wariantu linkiem', () => {
+  const BASE = 'https://przyklad.github.io/dom-3d/';
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  /** Atrapa okna: adres strony, history.replaceState i zdarzenie 'hashchange'. */
+  function fakeWin(hash = '') {
+    const listeners = new Set();
+    const win = {
+      location: { origin: 'https://przyklad.github.io', pathname: '/dom-3d/', search: '', hash },
+      replaced: [],
+      history: {
+        state: null,
+        replaceState(state, title, url) {
+          win.replaced.push(url);
+          win.location.hash = url.includes('#') ? url.slice(url.indexOf('#')) : '';
+        },
+      },
+      addEventListener: (name, fn) => name === 'hashchange' && listeners.add(fn),
+      removeEventListener: (name, fn) => listeners.delete(fn),
+      /** Otwarcie linku, gdy strona już działa. */
+      navigate(newHash) {
+        win.location.hash = newHash;
+        for (const fn of [...listeners]) fn();
+      },
+      listeners,
+    };
+    return win;
+  }
+
+  /** Nadawca: druga, niezależna „przeglądarka” z własnym wariantem. */
+  async function senderLink(mutate = () => {}) {
+    const { app, controller } = setup({ raw: fakeStorage() });
+    app.variant.update((d) => {
+      d.name = 'Salon Żony 🏡';
+      d.finishes['parter:0/3:floor'] = { kind: 'material', id: 'deska-dab', rot: 90 };
+      d.finishes['parter:0/3:wall:2'] = { kind: 'split', height: 1.2, lower: { kind: 'material', id: 'plytka', rot: 0 }, upper: { kind: 'paint', color: '#aabbcc' } };
+      d.finishes['parter:9/9:floor'] = { kind: 'paint', color: '#123456' }; // powierzchnia, której odbiorca nie ma
+      mutate(d);
+    });
+    const link = await controller.shareLink();
+    return { link, variant: app.variant.get(), controller };
+  }
+  const withBase = (ctxOptions = {}) => {
+    const app = fakeApp();
+    const raw = ctxOptions.raw || fakeStorage({ [STORAGE_KEY]: storedState() });
+    const controller = createController(app, { storage: createStorage({ storage: raw }), makeId: idGenerator(), now: () => NOW, createStarter: () => [sofa], baseUrl: () => BASE });
+    return { app, raw, controller };
+  };
+
+  beforeEach(() => vi.useRealTimers());
+
+  it('kontroler buduje link z adresu strony w podkatalogu; tytuł i opis z nazwą wariantu', async () => {
+    const { app, controller } = withBase();
+    const link = await controller.shareLink();
+    expect(link.ok).toBe(true);
+    expect(link.url).toMatch(/^https:\/\/przyklad\.github\.io\/dom-3d\/#w=1\.[zj]\.[A-Za-z0-9_-]+$/);
+    expect(link.title).toContain(app.variant.get().name);
+    expect(link.text).toContain(app.variant.get().name);
+  });
+
+  it('wariant z własnym zdjęciem płytki: brak linku, powód dla użytkownika', async () => {
+    const { app, controller } = withBase();
+    app.variant.update((d) => {
+      d.customMaterials.push({ id: 'wlasny-1', name: 'Moja', dataUrl: 'data:image/png;base64,AAAA', size: [0.6, 0.6] });
+      d.finishes['parter:0/3:floor'] = { kind: 'material', id: 'wlasny-1', rot: 0 };
+    });
+    const link = await controller.shareLink();
+    expect(link).toMatchObject({ ok: false, reason: 'customMaterials' });
+    expect(link.message).toMatch(/plik/);
+  });
+
+  it('readShared: walidacja jak przy imporcie, bez zmiany stanu; addShared: nowy aktywny wariant, nic nie nadpisane', async () => {
+    const { link } = await senderLink();
+    const { app, raw, controller } = withBase();
+    const before = JSON.stringify(controller.getState().variants);
+    const writes = raw.writes;
+
+    const read = await controller.readShared(link.url.split('#w=')[1]);
+    expect(read.ok).toBe(true);
+    expect(read.variant.name).toBe('Salon Żony 🏡');
+    expect(Object.keys(read.variant.finishes)).toEqual(['parter:0/3:floor', 'parter:0/3:wall:2']);
+    expect(read.report.skippedSurfaces).toBe(1);
+    expect(JSON.stringify(controller.getState().variants)).toBe(before); // samo odczytanie niczego nie dodaje
+    expect(raw.writes).toBe(writes);
+
+    const added = controller.addShared(read.variant, read.report);
+    expect(added.ok).toBe(true);
+    expect(added.message).toMatch(/Dodano wariant «Salon Żony 🏡»\. Pominięto 1 wykończenie/);
+    const state = controller.getState();
+    expect(state.variants).toHaveLength(3);
+    expect(state.activeId).toBe(added.id);
+    expect(app.variant.get().finishes['parter:0/3:wall:2']).toEqual({ kind: 'split', height: 1.2, lower: { kind: 'material', id: 'plytka', rot: 0 }, upper: { kind: 'paint', color: '#aabbcc' } });
+    expect(JSON.stringify(state.variants.slice(0, 2))).toBe(before); // istniejące warianty bez zmian
+    controller.flush();
+    expect(saved(raw).variants).toHaveLength(3);
+  });
+
+  it('ten sam link drugi raz i kolizja id: kolejna kopia z dopiskiem i nowym id', async () => {
+    const { link } = await senderLink();
+    const { controller } = withBase();
+    const payload = link.url.split('#w=')[1];
+    const first = controller.addShared((await controller.readShared(payload)).variant);
+    const second = controller.addShared((await controller.readShared(payload)).variant);
+    expect(second.name).toBe('Salon Żony 🏡 (2)');
+    expect(second.id).not.toBe(first.id);
+    const state = controller.getState();
+    expect(state.variants).toHaveLength(4);
+    expect(new Set(state.variants.map((v) => v.id)).size).toBe(4);
+    expect(state.variants.find((v) => v.id === first.id).name).toBe('Salon Żony 🏡');
+  });
+
+  it('pełna lista wariantów: wariant z linku nie jest dodawany', async () => {
+    const { link } = await senderLink();
+    const { controller } = withBase();
+    while (controller.getState().variants.length < LIMITS.variants) controller.createFromProject();
+    const read = await controller.readShared(link.url.split('#w=')[1]);
+    const added = controller.addShared(read.variant);
+    expect(added.ok).toBe(false);
+    expect(added.message).toMatch(/najwyżej/);
+    expect(controller.getState().variants).toHaveLength(LIMITS.variants);
+  });
+
+  it('zły link: komunikat bez wyjątku', async () => {
+    const { controller } = withBase();
+    for (const bad of ['', 'śmieci', '1.z.AAAA', '1.j.e30', null]) {
+      expect(await controller.readShared(bad)).toEqual({ ok: false, message: 'Link do wariantu jest uszkodzony lub niepełny' });
+    }
+    expect((await controller.readShared('7.z.AAAA')).message).toMatch(/nowszej wersji/);
+  });
+
+  describe('odbiór (receive.js)', () => {
+    const receiver = async (hash, ctx = withBase()) => {
+      const { createShareReceiver } = await import('../src/features/variants/receive.js');
+      const win = fakeWin(hash);
+      const rec = createShareReceiver(ctx.app, ctx.controller, { win, defer: async () => {} });
+      return { ...ctx, win, rec };
+    };
+    const panelButton = (app, text) => [...app.currentPanel.content.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
+
+    it('pyta przed dodaniem; „Dodaj i otwórz” dodaje nowy aktywny wariant i czyści fragment adresu', async () => {
+      const { link } = await senderLink();
+      const { app, controller, win, rec } = await receiver(new URL(link.url).hash);
+      const before = JSON.stringify(controller.getState().variants);
+      expect(await rec.check()).toBe(true);
+
+      expect(win.replaced).toEqual(['/dom-3d/']); // fragment usunięty – odświeżenie nie zapyta ponownie
+      expect(win.location.hash).toBe('');
+      expect(app.currentPanel.title).toBe('Wariant z linku');
+      const text = app.currentPanel.content.textContent;
+      expect(text).toContain('Dodać wariant «Salon Żony 🏡»?');
+      expect(text).toContain('2 wykończenia · 1 mebel');
+      expect(controller.getState().variants).toHaveLength(2); // jeszcze nic nie dodano
+      const buttons = [...app.currentPanel.content.querySelectorAll('button')].map((b) => b.textContent);
+      expect(buttons).toEqual(['Dodaj i otwórz', 'Nie teraz']);
+
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(app.currentPanel).toBeNull();
+      const state = controller.getState();
+      expect(state.variants).toHaveLength(3);
+      expect(app.variant.get().name).toBe('Salon Żony 🏡');
+      expect(state.activeId).toBe(app.variant.get().id);
+      expect(JSON.stringify(state.variants.slice(0, 2))).toBe(before);
+      expect(app.toasts.at(-1)).toMatch(/Dodano wariant «Salon Żony 🏡»/);
+      expect(await rec.check()).toBe(false); // drugi raz nic się nie dzieje
+    });
+
+    it('„Nie teraz” niczego nie dodaje, a fragment i tak znika', async () => {
+      const { link } = await senderLink();
+      const { app, controller, win, rec } = await receiver(new URL(link.url).hash);
+      await rec.check();
+      panelButton(app, 'Nie teraz').click();
+      expect(app.currentPanel).toBeNull();
+      expect(controller.getState().variants).toHaveLength(2);
+      expect(win.location.hash).toBe('');
+      expect(app.toasts).toEqual([]);
+    });
+
+    it('uszkodzony albo ucięty link: komunikat, brak pytania, czysty adres', async () => {
+      const { link } = await senderLink();
+      const hash = new URL(link.url).hash;
+      for (const bad of [hash.slice(0, hash.length - 9), '#w=', '#w=abc', '#w=1.z.%%%']) {
+        const { app, controller, win, rec } = await receiver(bad);
+        expect(await rec.check()).toBe(true);
+        expect(app.toasts).toEqual(['Link do wariantu jest uszkodzony lub niepełny']);
+        expect(app.currentPanel).toBeNull();
+        expect(controller.getState().variants).toHaveLength(2);
+        expect(win.location.hash).toBe('');
+      }
+    });
+
+    it('link z prefiksem zakodowanym procentowo (#w%3D…) działa jak zwykły', async () => {
+      const { link } = await senderLink();
+      const { app, win, rec } = await receiver(new URL(link.url).hash.replace('#w=', '#w%3D'));
+      expect(await rec.check()).toBe(true);
+      expect(win.location.hash).toBe('');
+      expect(app.currentPanel.content.textContent).toContain('Dodać wariant «Salon Żony 🏡»?');
+    });
+
+    it('pytanie zamknięte bez wyboru (krzyżyk, inny panel): nic nie dodane, ale jest komunikat', async () => {
+      const { link } = await senderLink();
+      const { app, controller, rec } = await receiver(new URL(link.url).hash);
+      await rec.check();
+      app.ui.openPanel({ title: 'Wykończenia', content: document.createElement('div') }); // np. dotknięcie ściany
+      expect(controller.getState().variants).toHaveLength(2);
+      expect(app.toasts).toEqual(['Wariant z linku nie został dodany – otwórz link ponownie, żeby go dodać.']);
+      app.ui.closePanel();
+      expect(app.toasts).toHaveLength(1); // tylko raz
+    });
+
+    it('drugi link, gdy pierwsze pytanie jest jeszcze otwarte: nowe pytanie bez komunikatu o starym', async () => {
+      const { link } = await senderLink();
+      const { link: other } = await senderLink((d) => {
+        d.name = 'Kuchnia';
+      });
+      const { app, controller, win, rec } = await receiver(new URL(link.url).hash);
+      await rec.check();
+      win.navigate(new URL(other.url).hash);
+      await vi.waitFor(() => expect(app.currentPanel.content.textContent).toContain('Dodać wariant «Kuchnia»?'));
+      expect(app.toasts).toEqual([]);
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(app.variant.get().name).toBe('Kuchnia');
+      expect(controller.getState().variants).toHaveLength(3);
+      expect(app.toasts).toHaveLength(1);
+    });
+
+    it('pełna lista: komunikat o limicie, pytanie zostaje otwarte i po zwolnieniu miejsca da się dodać', async () => {
+      const { link } = await senderLink();
+      const { app, controller, rec } = await receiver(new URL(link.url).hash);
+      while (controller.getState().variants.length < LIMITS.variants) controller.createFromProject();
+      await rec.check();
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(app.toasts).toEqual([expect.stringMatching(/najwyżej/)]);
+      expect(app.currentPanel?.title).toBe('Wariant z linku'); // nie trzeba otwierać linku od nowa
+      expect(controller.getState().variants).toHaveLength(LIMITS.variants);
+
+      const spare = controller.getState().variants.find((v) => v.id !== controller.getState().activeId);
+      expect(controller.remove(spare.id)).toBeTruthy();
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(app.currentPanel).toBeNull();
+      expect(app.variant.get().name).toBe('Salon Żony 🏡');
+      expect(app.toasts.at(-1)).toMatch(/Dodano wariant/);
+    });
+
+    it('paste: link wklejony ręcznie (cała wiadomość) idzie tą samą drogą – pytanie, potem dodanie', async () => {
+      const { link } = await senderLink();
+      const { app, controller, win, rec } = await receiver('');
+      expect(await rec.paste(`Wariant „Salon” – model 3D domu ${link.url}.`)).toBe(true);
+      expect(app.currentPanel.content.textContent).toContain('Dodać wariant «Salon Żony 🏡»?');
+      expect(controller.getState().variants).toHaveLength(2); // bez pytania nic nie jest dodawane
+      expect(win.replaced).toEqual([]); // adres strony bez zmian
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(controller.getState().variants).toHaveLength(3);
+      expect(app.variant.get().name).toBe('Salon Żony 🏡');
+
+      expect(await rec.paste('to nie jest link')).toBe(false);
+      expect(app.toasts.at(-1)).toBe('W tym tekście nie ma linku do wariantu. Skopiuj cały link z wiadomości.');
+      expect(await rec.paste(`${link.url.slice(0, -12)}`)).toBe(true);
+      expect(app.toasts.at(-1)).toBe('Link do wariantu jest uszkodzony lub niepełny');
+      expect(app.currentPanel).toBeNull();
+      expect(controller.getState().variants).toHaveLength(3);
+    });
+
+    it('init(app): panel Warianty ma „Wklej link…” – wklejony link otwiera pytanie (ikona na ekranie telefonu)', async () => {
+      const { link } = await senderLink();
+      const { init } = await import('../src/features/variants/index.js');
+      const app = fakeApp();
+      const feature = init(app, { storage: fakeStorage(), makeId: idGenerator(), now: () => NOW, win: fakeWin(''), defer: async () => {}, nav: null });
+      feature.openPanel();
+      const root = app.currentPanel.content;
+      const byText = (text) => [...root.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
+      const input = root.querySelector('input[aria-label="Link do wariantu z wiadomości"]');
+      expect(input.closest('.war-link').hidden).toBe(true);
+      byText('Wklej link…').click();
+      expect(input.closest('.war-link').hidden).toBe(false);
+
+      byText('Dodaj z linku').click(); // puste pole
+      expect(app.toasts.at(-1)).toBe('Wklej link do wariantu.');
+      expect(app.currentPanel.title).toBe('Warianty');
+
+      input.value = link.url;
+      byText('Dodaj z linku').click();
+      await vi.waitFor(() => expect(app.currentPanel?.title).toBe('Wariant z linku'));
+      expect(feature.getState().variants).toHaveLength(1);
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(feature.getState().variants.map((v) => v.name)).toEqual(['Wariant 1', 'Salon Żony 🏡']);
+      feature.destroy();
+    });
+
+    it('zwykły fragment adresu (nie w=) zostaje nietknięty', async () => {
+      const { app, win, rec } = await receiver('#salon');
+      expect(await rec.check()).toBe(false);
+      expect(win.replaced).toEqual([]);
+      expect(app.currentPanel).toBeNull();
+    });
+
+    it('hashchange: link otwarty, gdy strona już działa', async () => {
+      const { link } = await senderLink();
+      const { app, controller, win, rec } = await receiver('');
+      expect(await rec.check()).toBe(false);
+      win.navigate(new URL(link.url).hash);
+      await vi.waitFor(() => expect(app.currentPanel?.title).toBe('Wariant z linku'));
+      expect(win.location.hash).toBe('');
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(controller.getState().variants).toHaveLength(3);
+      rec.dispose();
+      expect(win.listeners.size).toBe(0);
+    });
+
+    it('init(app): pytanie pojawia się po starcie pozostałych funkcji i nie zamyka go nic po drodze', async () => {
+      const { link } = await senderLink();
+      const { init } = await import('../src/features/variants/index.js');
+      const app = fakeApp();
+      const win = fakeWin(new URL(link.url).hash);
+      let release;
+      const feature = init(app, { storage: fakeStorage(), makeId: idGenerator(), now: () => NOW, win, defer: () => new Promise((r) => (release = r)) });
+      expect(win.location.hash).toBe(''); // fragment znika od razu
+      await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+      expect(app.currentPanel).toBeNull(); // do „następnej klatki” (po app.start()) pytania jeszcze nie ma
+      expect(feature.getState().variants).toHaveLength(1);
+      release();
+      await vi.waitFor(() => expect(app.currentPanel?.title).toBe('Wariant z linku'));
+      panelButton(app, 'Dodaj i otwórz').click();
+      expect(feature.getState().variants.map((v) => v.name)).toEqual(['Wariant 1', 'Salon Żony 🏡']);
+      expect(app.buttons[0].label).toBe('Salon Żony 🏡');
+      feature.destroy();
+      expect(win.listeners.size).toBe(0);
+    });
+  });
+
+  describe('panel: przyciski „Udostępnij” i „Wyślij plik”', () => {
+    const abort = () => Object.assign(new Error('Share canceled'), { name: 'AbortError' });
+    const open = (nav, ctx = withBase()) => {
+      const toasts = [];
+      const downloads = [];
+      const view = createVariantsPanel(ctx.controller, {
+        toast: (t) => toasts.push(t),
+        download: (filename, text) => downloads.push({ filename, text }),
+        nav,
+        makeFile: (filename, text) => ({ name: filename, text, type: 'application/json' }),
+      });
+      document.body.replaceChildren(view.element);
+      const byText = (text) => [...view.element.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
+      const click = async (text) => {
+        byText(text).click();
+        await tick();
+        await tick();
+      };
+      return { ...ctx, view, toasts, downloads, byText, click, linkBox: () => view.element.querySelector('.war-link') };
+    };
+
+    it('navigator.share dostaje tytuł, opis i link; anulowanie arkusza nie jest błędem', async () => {
+      const shared = [];
+      let fail = null;
+      const nav = { share: async (data) => (fail ? Promise.reject(fail) : shared.push(data)), clipboard: { writeText: async () => shared.push('schowek') } };
+      const p = open(nav);
+      expect(p.view.element.textContent).toMatch(/Odbiorca dostaje kopię wariantu/);
+      expect(p.view.element.textContent).toMatch(/Każdy, kto ma link, zobaczy/);
+      expect(p.view.element.textContent).toContain('Udostępnij: Ciemny');
+      await p.click('Udostępnij');
+      expect(shared).toHaveLength(1);
+      expect(shared[0].url).toMatch(/^https:\/\/przyklad\.github\.io\/dom-3d\/#w=1\./);
+      expect(shared[0].title).toContain('Ciemny');
+      // odbiorca dostaje dokładnie ten wariant
+      const read = await withBase().controller.readShared(shared[0].url.split('#w=')[1]);
+      expect(read.variant.name).toBe('Ciemny');
+
+      fail = abort();
+      await p.click('Udostępnij');
+      expect(shared).toHaveLength(1); // ani schowek, ani komunikat
+      expect(p.toasts).toEqual([]);
+      expect(p.linkBox().hidden).toBe(true);
+    });
+
+    it('bez navigator.share: schowek + „Link skopiowany”; bez schowka: pole z linkiem', async () => {
+      const copied = [];
+      const p = open({ clipboard: { writeText: async (t) => copied.push(t) } });
+      await p.click('Udostępnij');
+      expect(copied[0]).toMatch(/#w=1\./);
+      expect(p.toasts).toEqual(['Link skopiowany']);
+
+      const q = open({});
+      await q.click('Udostępnij');
+      expect(q.toasts).toEqual([]);
+      expect(q.linkBox().hidden).toBe(false);
+      expect(q.linkBox().querySelector('input').value).toMatch(/^https:\/\/przyklad\.github\.io\/dom-3d\/#w=1\./);
+
+      // schowek odmawia (brak zgody) → też pole z linkiem
+      const r = open({ share: async () => Promise.reject(new Error('NotAllowed')), clipboard: { writeText: async () => Promise.reject(new Error('denied')) } });
+      await r.click('Udostępnij');
+      expect(r.linkBox().hidden).toBe(false);
+    });
+
+    it('link nie może powstać → komunikat i propozycja pliku; „Wyślij plik” udostępnia plik eksportu', async () => {
+      const shared = [];
+      const nav = { share: async (data) => shared.push(data), canShare: (data) => Array.isArray(data.files) };
+      const ctx = withBase();
+      ctx.app.variant.update((d) => {
+        d.customMaterials.push({ id: 'wlasny-1', name: 'Moja', dataUrl: 'data:image/png;base64,AAAA', size: [0.6, 0.6] });
+        d.finishes['parter:0/3:floor'] = { kind: 'material', id: 'wlasny-1', rot: 0 };
+      });
+      const p = open(nav, ctx);
+      await p.click('Udostępnij');
+      expect(shared).toEqual([]);
+      const info = [...p.view.element.querySelectorAll('[role="status"]')].find((n) => /zdjęcia płytek/.test(n.textContent));
+      expect(info.hidden).toBe(false);
+      expect(info.textContent).toMatch(/Wyślij go jako plik/);
+      expect(p.byText('Wyślij plik').classList.contains('war-btn--primary')).toBe(true);
+
+      await p.click('Wyślij plik');
+      expect(shared).toHaveLength(1);
+      const file = shared[0].files[0];
+      expect(file.name).toBe('dom-ciemny-2026-11-24.json');
+      const data = JSON.parse(file.text);
+      expect(data.app).toBe(APP_ID);
+      expect(data.variants[0].customMaterials).toHaveLength(1); // plik niesie zdjęcie płytki
+      expect(p.downloads).toEqual([]);
+      expect(info.hidden).toBe(true);
+    });
+
+    it('„Wyślij plik” bez udostępniania plików → zwykłe pobranie; anulowanie arkusza nie pobiera', async () => {
+      const p = open({ share: async () => {}, canShare: () => false });
+      await p.click('Wyślij plik');
+      expect(p.downloads.map((d) => d.filename)).toEqual(['dom-ciemny-2026-11-24.json']);
+      expect(p.toasts.at(-1)).toMatch(/Zapisano plik dom-ciemny-2026-11-24\.json/);
+
+      const q = open(null);
+      await q.click('Wyślij plik');
+      expect(q.downloads).toHaveLength(1);
+
+      const r = open({ share: async () => Promise.reject(abort()), canShare: () => true });
+      await r.click('Wyślij plik');
+      expect(r.downloads).toEqual([]);
+      expect(r.toasts).toEqual([]);
+    });
+
+    it('po przełączeniu wariantu link dotyczy nowego aktywnego', async () => {
+      const shared = [];
+      const p = open({ share: async (data) => shared.push(data) });
+      const other = p.controller.getState().variants.find((v) => v.id !== p.controller.getState().activeId);
+      p.controller.switchTo(other.id);
+      expect(p.view.element.textContent).toContain(`Udostępnij: ${other.name}`);
+      await p.click('Udostępnij');
+      const read = await withBase().controller.readShared(shared[0].url.split('#w=')[1]);
+      expect(read.variant.name).toBe(other.name);
+    });
+  });
+});

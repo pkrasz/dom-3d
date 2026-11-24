@@ -194,3 +194,40 @@
   line-height: 1.4;
   color: var(--muted);
 }
+
+/* udostępnianie: przycisk główny wyraźnie większy od pozostałych */
+.war-share {
+  flex: 2 1 160px;
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.war [hidden] {
+  display: none;
+}
+
+.war-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.war-link__input {
+  flex: 0 0 auto;
+  width: 100%;
+  font-size: 16px;
+}
+
+/* pytanie „Dodać wariant z linku?” */
+.war-ask__question {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.war-ask .war-btn {
+  min-height: 48px;
+}
