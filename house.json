@@ -1,0 +1,363 @@
+{
+  "meta": {
+    "name": "Dom",
+    "schemaVersion": 1,
+    "units": "m",
+    "status": "Etap 2b: parter (zweryfikowany przez inwestora 2026-11-24), poddasze, schody, strop i dach uproszczony.",
+    "coordinates": "Początek (0,0) w lewym-dolnym zewnętrznym narożniku MURU na rzucie parteru (narożnik garażu przy bramie). x w prawo arkusza (0..13,60), y w górę arkusza (0..10,10), z w górę od posadzki parteru ±0,00. Wymiar 14,00 × 10,50 z projektu to obrys z ociepleniem 20 cm.",
+    "dimensionsAre": "Wymiary surowe z projektu (mur bez tynków) – rys. 1, uwaga 4.",
+    "sources": {
+      "rys1": "rusunki_z_projektu/1.pdf – rzut parteru 1:100",
+      "rys2": "rusunki_z_projektu/2.pdf – rzut poddasza 1:100",
+      "rys3": "rusunki_z_projektu/3.pdf – rzut dachu",
+      "rys4": "rusunki_z_projektu/4.pdf – przekroje A-A, B-B, C-C",
+      "rys5-8": "rusunki_z_projektu/5–8.pdf – elewacje",
+      "analiza": "model3d/etap1_analiza/*.md – odczyt uzgodniony"
+    },
+    "confidenceLegend": {
+      "pewne": "liczba wpisana wprost na rysunku",
+      "wyliczone": "wynika z łańcucha wymiarów",
+      "pomiar": "zmierzone ze skali rysunku wektorowego (dokładność ok. 1 cm)",
+      "zalozenie": "nie ma w projekcie – przyjęte, do zmiany"
+    },
+    "rule": "Ten plik opisuje wyłącznie geometrię z projektu. Wykończenie (kolory, płytki, podłogi, meble) trzymane jest w osobnych plikach wariantów i nigdy nie zmienia tego pliku.",
+    "buildRules": [
+      "Identyfikatory ścian, otworów i pomieszczeń są unikalne w obrębie kondygnacji (Z-W występuje na parterze i na poddaszu).",
+      "Przejście bez drzwi: na parterze lista passages (miejsca bez muru, pod podciągiem lub w linii ścianki), na poddaszu otwór kind = passage w ścianie – oba oznaczają otwór do podłogi bez stolarki.",
+      "Posadzkę w progach drzwi i przejść buduje się z prostokąta otworu (openingRect w tools/geometry.mjs) – wieloboki pomieszczeń nie obejmują grubości ścian.",
+      "Źródło dla otworu klatki: levels[parter].slabAbove.openings (kind = stairs); stairs.slabOpening i stairVoid.rect muszą być z nim równe (pilnuje tego check.mjs).",
+      "Wysokość stopnia do budowy brył: rise / risers (pole riserModel), nie zaokrąglone 16,8 cm.",
+      "Wysokość pomieszczeń poddasza: levels[poddasze].ceiling (ceilingHeight = ceiling.flatHeight)."
+    ],
+    "north": { "bearingOfMinusY_deg": 291, "note": "Front (dół arkusza, garaż i wejście) patrzy na ok. 291° (WNW); taras ok. 111° (ESE); szczyt salonu ok. 201° (SSW). Z mapy PZT, potwierdzone wcześniej przez inwestora.", "conf": "pomiar" }
+  },
+
+  "construction": {
+    "exteriorInsulation": { "thickness": 0.20, "src": "rys1 łańcuchy (20 na obu końcach), rys13", "conf": "pewne" },
+    "wallTypes": {
+      "ext": { "label": "zewnętrzna nośna, pustak ceramiczny", "thickness": 0.25, "insulated": true },
+      "int": { "label": "wewnętrzna nośna", "thickness": 0.25 },
+      "part": { "label": "działowa", "thickness": 0.12 }
+    }
+  },
+
+  "levels": [
+    {
+      "id": "parter",
+      "name": "Parter",
+      "floorLevel": 0.0,
+      "ceilingHeight": 2.70,
+      "ceilingNote": "Do spodu płyty stropu, bez tynku 1,5 cm; dotyczy też garażu. rys1 H=270, rys4 wymiar 270 na A-A, B-B, C-C.",
+      "slabAbove": { "thickness": 0.16, "floorBuildUp": 0.17, "nextFloorLevel": 3.03, "outline": [0.00, 0.00, 13.60, 10.10], "openings": [ { "kind": "stairs", "rect": [5.30, 4.80, 7.92, 6.80] }, { "kind": "chimney", "id": "K-A", "rect": [2.60, 8.21, 2.96, 9.21] }, { "kind": "chimney", "id": "K-B", "rect": [5.05, 7.83, 5.30, 8.19] }, { "kind": "chimney", "id": "K-C", "rect": [9.05, 2.79, 9.41, 3.76] } ], "src": "rys4: 270|16|17; rys2 otwór klatki 262 × 200; rys10 przerwy w siatce zbrojenia przy kominach", "conf": "pewne", "note": "Płyta na całym obrysie murów, także nad wnęką wejściową: sufit wnęki surowy +2,70 (2,72 m nad podestem), jego ocieplenie i wykończenie nie są w projekcie określone. Otwory: klatka schodowa i trzy przejścia kominów w obrysach z chimneys parteru. Warstwy posadzki 17 cm leżą tylko w obrysach pomieszczeń poddasza i w progach otworów – ściany poddasza stoją na płycie." },
+
+      "walls": [
+        { "id": "Z-W", "type": "ext", "rect": [0.00, 0.00, 0.25, 10.10], "label": "szczyt garażu (lewa)", "src": "rys1 łańcuch lewy 20|25|280|25|655|25|20", "conf": "pewne" },
+        { "id": "Z-N", "type": "ext", "rect": [0.25, 9.85, 13.35, 10.10], "label": "ściana ogrodowa (górna)", "src": "rys1 łańcuch górny 20|25|271|12|197|25|350|25|430|25|20", "conf": "pewne" },
+        { "id": "Z-E", "type": "ext", "rect": [13.35, 0.00, 13.60, 10.10], "label": "szczyt salonu (prawa)", "src": "rys1 łańcuch prawy 20|25|960|25|20", "conf": "pewne", "note": "Poniżej y=2,07 na rzucie nie ma muru w poziomie cięcia – jest tam okno narożne O5 (mur tylko pod parapetem i w nadprożu)." },
+        { "id": "Z-S-garaz", "type": "ext", "rect": [0.25, 0.00, 5.05, 0.25], "label": "front, garaż", "src": "rys1 łańcuch dolny 20|25|480|25", "conf": "pewne" },
+        { "id": "Z-wneka-L", "type": "ext", "rect": [5.05, 0.00, 5.30, 0.60], "label": "lewy bok wnęki wejściowej", "src": "rys1, długość 60 z pomiaru", "conf": "pomiar" },
+        { "id": "Z-S-wejscie", "type": "ext", "rect": [5.30, 0.60, 8.80, 0.85], "label": "front, ściana wejściowa cofnięta", "src": "rys1 łańcuch 125|150|75; położenie w y z łańcucha wewnętrznego 280|25|100|100|25|178|12|180|25 (rys1 + rys2)", "conf": "wyliczone" },
+        { "id": "Z-wneka-P", "type": "ext", "rect": [8.80, 0.00, 9.05, 0.60], "label": "prawy bok wnęki wejściowej", "src": "rys1, długość 60 z pomiaru", "conf": "pomiar" },
+        { "id": "Z-S-salon", "type": "ext", "rect": [9.05, 0.00, 13.35, 0.25], "label": "front, salon", "src": "rys1 łańcuch dolny 248|25|200|7", "conf": "pewne", "note": "Od x=11,53 okno narożne O6." },
+        { "id": "W1", "type": "int", "rect": [5.05, 0.60, 5.30, 9.85], "label": "nośna: garaż, spiżarnia | wiatrołap, łazienka, schody, kuchnia", "src": "rys1 łańcuchy górny i dolny (25 między 480 a 350)", "conf": "pewne" },
+        { "id": "W2a", "type": "int", "rect": [0.25, 6.80, 5.05, 7.05], "label": "nośna: garaż | pom. techniczne, spiżarnia", "src": "rys1 łańcuch lewy 280|25|655", "conf": "pewne" },
+        { "id": "W2b", "type": "int", "rect": [5.30, 6.80, 9.05, 7.05], "label": "nośna: schody | kuchnia (kończy się słupem C1)", "src": "rys1 łańcuch 280|25|304", "conf": "pewne" },
+        { "id": "W3", "type": "int", "rect": [8.80, 0.60, 9.05, 3.76], "label": "nośna: wiatrołap, korytarz | salon (kończy się słupem C1)", "src": "rys1 łańcuch salonu 326|25 i 36|61|254", "conf": "pewne" },
+        { "id": "W4", "type": "int", "rect": [5.30, 4.55, 7.38, 4.80], "label": "nośna: łazienka | przestrzeń pod schodami", "src": "rys1 wymiar 208 i 25|178|12", "conf": "pewne" },
+        { "id": "D1", "type": "part", "rect": [2.96, 7.05, 3.08, 9.85], "label": "działowa: pom. techniczne | spiżarnia", "src": "rys1 łańcuch górny 271|12|197", "conf": "pewne" },
+        { "id": "D2", "type": "part", "rect": [6.70, 2.77, 6.82, 4.55], "label": "działowa: łazienka | korytarz", "src": "rys1 łańcuch 25|140|12", "conf": "pewne" },
+        { "id": "D3", "type": "part", "rect": [5.30, 2.65, 6.82, 2.77], "label": "działowa: łazienka | wiatrołap", "src": "rys1 łańcuch 180 (wiatrołap) i 152|198", "conf": "pewne" }
+      ],
+
+      "openings": [
+        { "id": "O1", "kind": "window", "wall": "Z-N", "at": [0.65, 1.55], "width": 0.90, "height": 1.50, "sill": 0.91, "frame": "88/145", "panes": 1, "room": "0/8", "src": "rys1 90/150, hp 91; rys7; rys4 B-B 91|150", "conf": "pewne" },
+        { "id": "O2", "kind": "window", "wall": "Z-N", "at": [6.60, 8.40], "width": 1.80, "height": 1.50, "sill": 0.91, "frame": "178/145", "panes": 2, "room": "0/5", "src": "rys1 180/150, hp 91; rys7", "conf": "pewne" },
+        { "id": "O3", "kind": "glazedDoor", "wall": "Z-N", "at": [9.85, 12.55], "width": 2.70, "height": 2.41, "sill": 0, "frame": "268/240", "panes": 2, "room": "0/6", "label": "drzwi tarasowe", "src": "rys1 270/241; rys7; rys4 C-C 241|45", "conf": "pewne", "note": "Sposób otwierania nie jest oznaczony w projekcie." },
+        { "id": "O4", "kind": "glazedDoor", "wall": "Z-E", "at": [5.12, 8.42], "width": 3.30, "height": 2.41, "sill": 0, "frame": "328/240", "panes": 2, "room": "0/6", "label": "przeszklenie do posadzki", "src": "rys1 330/241; rys8; rys4 A-A 241|45", "conf": "pewne", "note": "Sposób otwierania nie jest oznaczony w projekcie." },
+        { "id": "O5", "kind": "window", "wall": "Z-E", "at": [0.07, 2.07], "width": 2.00, "height": 1.50, "sill": 0.91, "frame": "199/145", "panes": 1, "room": "0/6", "corner": "O6", "label": "okno narożne – ramię w szczycie", "src": "rys1 łańcuch 200|7, h=91; wysokość 150 z rys4 C-C 91|150", "conf": "wyliczone" },
+        { "id": "O6", "kind": "window", "wall": "Z-S-salon", "at": [11.53, 13.53], "width": 2.00, "height": 1.50, "sill": 0.91, "frame": "199/145", "panes": 1, "room": "0/6", "corner": "O5", "label": "okno narożne – ramię od frontu", "src": "rys1 łańcuch 25|200|7, h=91; rys4 C-C 91|150", "conf": "wyliczone", "note": "W narożniku słupek stolarki 7 × 7 cm, bez słupa żelbetowego." },
+        { "id": "O7", "kind": "entranceDoor", "wall": "Z-S-wejscie", "at": [6.55, 8.05], "width": 1.50, "height": 2.13, "sill": 0, "frame": "148/212", "room": "0/1", "hinge": 8.05, "leaf": 1.00, "hingeOffset": 0.0, "swing": "-y", "label": "drzwi wejściowe z doświetlem", "src": "rys1 150/213; rys5", "conf": "pewne", "note": "Otwierane na zewnątrz. Podział: skrzydło ok. 100 cm + stałe doświetle ok. 50 cm z lewej – z pomiaru." },
+        { "id": "O8", "kind": "garageDoor", "wall": "Z-S-garaz", "at": [0.75, 4.55], "width": 3.80, "height": 2.26, "sill": 0, "mark": "Wr1", "room": "0/9", "label": "brama garażowa", "src": "rys1 380/226; rys5; rys4 B-B 226|35", "conf": "pewne" },
+        { "id": "O9", "kind": "window", "wall": "Z-W", "at": [2.15, 3.65], "width": 1.50, "height": 0.90, "sill": 1.36, "frame": "148/85", "panes": 1, "room": "0/9", "src": "rys1 150/90, hp 136; rys6", "conf": "pewne" },
+        { "id": "O10", "kind": "window", "wall": "Z-W", "at": [4.88, 6.68], "width": 1.80, "height": 0.90, "sill": 1.36, "frame": "178/85", "panes": 1, "room": "0/9", "src": "rys1 180/90, hp 136; rys6; rys4 A-A 136|90", "conf": "pewne" },
+
+        { "id": "DW1", "kind": "door", "wall": "W2a", "at": [0.50, 1.42], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["0/8", "0/9"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 0.50, "swing": "-y", "src": "rys1 92/208", "conf": "pewne" },
+        { "id": "DW2", "kind": "door", "wall": "W2a", "at": [3.73, 4.65], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["0/4", "0/9"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 4.65, "swing": "-y", "src": "rys1 92/208 i 92|40", "conf": "pewne" },
+        { "id": "DW3", "kind": "door", "wall": "W1", "at": [0.98, 1.90], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["0/9", "0/1"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 0.98, "swing": "+x", "src": "rys1 92/208 i 13|92", "conf": "pewne" },
+        { "id": "DW4", "kind": "door", "wall": "W1", "at": [8.43, 9.15], "width": 0.72, "height": 2.08, "sill": 0, "mark": "D60", "between": ["0/4", "0/5"], "leaf": 0.60, "hingeOffset": 0.06, "hinge": 9.15, "swing": "+x", "src": "rys1 łańcuch 70|72|138, 72/208", "conf": "pewne" },
+        { "id": "DW5", "kind": "door", "wall": "D2", "at": [3.02, 3.94], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["0/3", "0/2"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 3.94, "swing": "+x", "src": "rys1 92/208 i 25|92", "conf": "pewne", "note": "Drzwi łazienki z podcięciem lub kratką (uwaga 3)." }
+      ],
+
+      "cornerWindows": [
+        { "id": "ON1", "openings": ["O5", "O6"], "cutout": [13.35, 0.00, 13.60, 0.25], "post": [13.53, 0.00, 13.60, 0.07], "sill": 0.91, "height": 1.50, "frameDepth": 0.07, "framePlane": "przy zewnętrznym licu muru", "rule": "Między parapetem 0,91 a nadprożem 2,41 w narożniku nie ma muru: pole 'cutout' jest w całości otworem, zostaje tylko słupek stolarki 'post' 7 × 7 cm. Szklenie każdego ramienia ma 2,00 m ('at' otworów O5 i O6), ramy leżą w zewnętrznych 7 cm grubości ściany, pozostałe 18 cm to parapet wewnętrzny. Poniżej parapetu i powyżej nadproża ściany Z-E i Z-S-salon są pełne.", "src": "rys1 łańcuchy 25|200|7 (dolny i prawy), brak grubych linii muru dla x>11,53 i y<2,07; rys4 C-C 91|150", "conf": "wyliczone" }
+      ],
+
+      "passages": [
+        { "id": "P1", "rect": [6.82, 2.65, 8.80, 2.77], "width": 1.98, "height": 2.70, "between": ["0/1", "0/2"], "label": "przejście bez drzwi, pełna wysokość", "src": "rys1 198/270; 152+198 = 350", "conf": "pewne", "note": "Na obu ościeżach projekt rysuje profile jak ościeżnica (3,8 × 11,8 cm), światło między nimi ok. 1,90 m; w modelu przejście gołe na szerokość otworu w murze." },
+        { "id": "P2", "rect": [8.80, 7.05, 9.05, 9.85], "width": 2.80, "height": 2.46, "between": ["0/5", "0/6"], "label": "otwarcie pod podciągiem", "src": "rys1 280/246", "conf": "pewne" },
+        { "id": "P3", "rect": [8.80, 3.76, 9.05, 6.80], "width": 3.04, "height": 2.46, "between": ["0/2", "0/6"], "label": "otwarcie pod podciągiem", "src": "rys1 304/246", "conf": "pewne" }
+      ],
+
+      "columns": [
+        { "id": "C1-1", "rect": [0.50, 0.00, 0.75, 0.25], "embedded": true },
+        { "id": "C1-2", "rect": [4.55, 0.00, 4.80, 0.25], "embedded": true },
+        { "id": "C1-3", "rect": [11.28, 0.00, 11.53, 0.25], "embedded": true },
+        { "id": "C1-4", "rect": [13.35, 2.07, 13.60, 2.32], "embedded": true },
+        { "id": "C1-5", "rect": [13.35, 4.87, 13.60, 5.12], "embedded": true },
+        { "id": "C1-6", "rect": [13.35, 8.42, 13.60, 8.67], "embedded": true },
+        { "id": "C1-7", "rect": [12.55, 9.85, 12.80, 10.10], "embedded": true },
+        { "id": "C1-8", "rect": [8.80, 9.85, 9.05, 10.10], "embedded": true },
+        { "id": "C1-9", "rect": [8.80, 6.80, 9.05, 7.05], "embedded": true, "note": "Koniec ściany W2b – widoczny we wnętrzu jako czoło ściany." },
+        { "id": "C1-10", "rect": [8.80, 3.51, 9.05, 3.76], "embedded": true, "note": "Koniec ściany W3 – widoczny we wnętrzu jako czoło ściany." }
+      ],
+      "columnsNote": "Słupy żelbetowe C1 25 × 25 cm w grubości ścian (rys1, rys9). Nie tworzą osobnych brył – służą do łańcuchów wymiarowych i kontroli.",
+
+      "beams": [
+        { "id": "B1", "rect": [8.80, 3.76, 9.05, 9.85], "underside": 2.46, "dropBelowCeiling": 0.24, "label": "podciąg między salonem a kuchnią/korytarzem", "src": "rys1 280/246 i 304/246; rys4 246|40", "conf": "pewne" },
+        { "id": "B2", "rect": [5.30, 0.00, 8.80, 0.25], "underside": 2.51, "finishedUnderside": 2.41, "section": "25 × 35 cm", "bearing": 0.25, "exteriorOnly": true, "label": "belka w licu frontu nad wnęką wejściową", "src": "rys10 (położenie), rys14 (przekrój 25×35, rozpiętość 350, oparcia po 25); spód: rys4 +2,86 minus 0,35; rys5 pomiar górnej krawędzi wnęki +2,41", "conf": "wyliczone", "note": "Widoczna tylko z zewnątrz, nad podestem. Projekt nie podaje rzędnej spodu liczbą: spód konstrukcyjny +2,51 wyliczony przy założeniu, że wierzch belki jest równo z wierzchem płyty (jak B1); na elewacji górna krawędź wnęki jest na +2,41, równo z nadprożami okien (10 cm różnicy to wykończenie nieopisane w projekcie). W modelu z zewnątrz pokazywać +2,41." }
+      ],
+
+      "chimneys": [
+        { "id": "K-A", "rect": [2.60, 8.21, 2.96, 9.21], "room": "0/8", "label": "komin SIH20L 36×50 + 4 kanały wentylacyjne (blok 36×100)", "src": "rys1 łańcuch 64|100|116, uwaga 2", "conf": "pewne" },
+        { "id": "K-B", "rect": [5.05, 7.83, 5.30, 8.19], "embeddedInWall": "W1", "label": "2 kanały wentylacyjne kuchni w grubości ściany", "src": "rys1 36 i 78", "conf": "wyliczone" },
+        { "id": "K-C", "rect": [9.05, 2.79, 9.41, 3.76], "room": "0/6", "label": "komin kominka SIH20 + przewód PC + 2 kanały wentylacyjne (blok 36×97)", "src": "rys1 łańcuch 36|61|254 i 36", "conf": "wyliczone", "fireplaceOutline": [9.41, 2.79, 9.96, 3.66], "fireplaceNote": "Obrys kominka 55 × 87 cm narysowany w projekcie (z pomiaru, bez wysokości) – wyposażenie, trafi do mebli startowych, nie do geometrii." }
+      ],
+
+      "rooms": [
+        { "id": "0/1", "name": "Wiatrołap", "polygon": [[5.30, 0.85], [8.80, 0.85], [8.80, 2.65], [5.30, 2.65]], "areaProject": 6.30, "floorProject": "terakota", "conf": "pewne" },
+        { "id": "0/2", "name": "Korytarz", "polygon": [[6.82, 2.65], [8.80, 2.65], [8.80, 6.80], [8.46, 6.80], [8.46, 5.80], [5.30, 5.80], [5.30, 4.80], [7.38, 4.80], [7.38, 4.55], [6.82, 4.55]], "areaProject": 5.10, "floorProject": "klepka", "conf": "zalozenie", "note": "Granica korytarz/schody/salon nie jest narysowana w projekcie. Przyjęto całą dostępną podłogę razem z otwartą przestrzenią pod biegiem górnym schodów (x 5,30..7,38; y 4,80..5,80), stąd powierzchnia większa niż 5,10 z tabeli." },
+        { "id": "0/3", "name": "Łazienka", "polygon": [[5.30, 2.77], [6.70, 2.77], [6.70, 4.55], [5.30, 4.55]], "areaProject": 2.49, "floorProject": "terakota", "conf": "pewne" },
+        { "id": "0/4", "name": "Spiżarnia", "polygon": [[3.08, 7.05], [5.05, 7.05], [5.05, 9.85], [3.08, 9.85]], "areaProject": 5.52, "floorProject": "terakota", "conf": "pewne" },
+        { "id": "0/5", "name": "Kuchnia", "polygon": [[5.30, 7.05], [9.05, 7.05], [9.05, 9.85], [5.30, 9.85]], "areaProject": 10.50, "floorProject": "terakota", "conf": "pewne", "note": "Liczona do x=9,05 (z pasem pod podciągiem) – tylko tak zgadza się z tabelą projektu." },
+        { "id": "0/6", "name": "Salon", "polygon": [[9.05, 0.25], [13.35, 0.25], [13.35, 9.85], [9.05, 9.85], [9.05, 6.80], [8.80, 6.80], [8.80, 3.76], [9.05, 3.76]], "areaProject": 41.86, "floorProject": "klepka", "conf": "wyliczone", "note": "4,30 × 9,60 plus pas pod podciągiem od strony korytarza (0,25 × 3,04) – przypisanie pasa to założenie." },
+        { "id": "0/7", "name": "Schody", "polygon": [[5.30, 5.80], [8.46, 5.80], [8.46, 6.80], [5.30, 6.80]], "areaProject": 3.16, "floorProject": "deski", "conf": "wyliczone", "note": "Rzut biegu dolnego i połowy zabiegu; tabela projektu 3,16 = 3,16 × 1,00." },
+        { "id": "0/8", "name": "Pom. techniczne", "polygon": [[0.25, 7.05], [2.96, 7.05], [2.96, 9.85], [0.25, 9.85]], "areaProject": 7.23, "floorProject": "terakota", "conf": "pewne" },
+        { "id": "0/9", "name": "Garaż", "polygon": [[0.25, 0.25], [5.05, 0.25], [5.05, 6.80], [0.25, 6.80]], "areaProject": 31.44, "floorProject": "terakota", "conf": "pewne" }
+      ],
+
+      "stairs": {
+        "id": "S1",
+        "from": "parter",
+        "to": "poddasze",
+        "risers": 18,
+        "riser": 0.168,
+        "tread": 0.27,
+        "rise": 3.03,
+        "riserModel": "Do budowy bryły: wysokość stopnia = rise / risers = 0,1683 m (opis projektu 16,8 cm daje 302,4 cm przy kondygnacji 303 cm).",
+        "flightWidth": 1.00,
+        "zone": [5.30, 4.80, 8.80, 6.80],
+        "slabOpening": { "rect": [5.30, 4.80, 7.92, 6.80], "src": "rys2 otwór 262 × 200; rys4 A-A krawędź stropu", "conf": "pewne", "note": "Strop przykrywa pas x 7,92..8,80 – nad dwoma pierwszymi stopniami i dojściem." },
+        "structure": { "type": "żelbetowe płytowe", "waistThickness": 0.12, "src": "rys4 A-A", "conf": "pomiar" },
+        "parts": [
+          { "kind": "flight", "rect": [6.30, 5.80, 8.46, 6.80], "treads": 8, "direction": "-x", "startAt": 8.46, "levels": [0.17, 1.35], "conf": "pewne", "src": "rys1 216 = 8 × 27; rys4 A-A" },
+          { "kind": "winder", "rect": [5.30, 4.80, 6.30, 6.80], "treads": 3, "levels": [1.52, 1.68, 1.85], "pivot": [6.30, 5.80], "splitTo": [[5.30, 6.80], [5.30, 4.80]], "conf": "pomiar", "src": "rys2: dwie linie zabiegu od narożnika duszy do narożników przy ścianie nośnej; rys4 A-A poziomy" },
+          { "kind": "flight", "rect": [6.30, 4.80, 7.92, 5.80], "treads": 6, "direction": "+x", "endAt": 7.92, "levels": [2.02, 2.86], "conf": "pewne", "src": "rys1 linie przerywane do x=7,92; rys2; rys4 A-A" }
+        ],
+        "balustradeHeight": 0.90,
+        "balustradeConf": "zalozenie",
+        "underStairs": { "rect": [5.30, 4.80, 7.38, 5.80], "open": true, "note": "Pod biegiem górnym i zabiegiem; otwarta od strony korytarza (decyzja inwestora: bez zabudowy)." },
+        "underLowerFlight": { "rect": [6.30, 5.80, 8.46, 6.80], "open": true, "conf": "zalozenie", "note": "Na linii y=5,80 projekt nie rysuje ściany – bok biegu dolnego otwarty, widoczna płyta schodów." },
+        "balustrades": [ { "from": [8.46, 5.80], "to": [6.30, 5.80], "type": "raked", "follows": "parts[0]", "baseFrom": 0.0, "baseTo": 1.35, "label": "wzdłuż biegu dolnego od strony korytarza", "conf": "zalozenie" } ],
+        "balustradesNote": "Balustrada biegu górnego i balustrady przy otworze na poddaszu – patrz stairVoid w kondygnacji poddasze. Projekt nie zawiera rysunku balustrad.",
+        "src": "rys1 18×16,8×27; rys2; rys4 A-A. Projekt nie zawiera rysunku wykonawczego schodów."
+      },
+
+      "exterior": [
+        { "id": "taras", "rect": [8.80, 10.30, 13.80, 13.80], "level": -0.02, "label": "taras 500 × 350", "steps": { "rect": [10.10, 13.80, 12.50, 14.40], "risers": 3, "treads": 2, "riser": 0.15, "tread": 0.30, "levels": [-0.17, -0.32] }, "src": "rys1 130|240|130, 350, 3×15×30; położenie lewej krawędzi (x=8,80) z pomiaru", "conf": "pewne" },
+        { "id": "podest", "rect": [5.50, -0.80, 8.60, 0.40], "level": -0.02, "label": "podest wejściowy 310 × 120", "steps": { "rect": [5.50, -1.40, 8.60, -0.80], "risers": 3, "treads": 2, "riser": 0.15, "tread": 0.30, "levels": [-0.17, -0.32] }, "src": "rys1 310, 120, 3×15×30", "conf": "pewne" },
+        { "id": "podjazd", "rect": [-0.20, -2.20, 5.50, -0.20], "label": "podjazd do garażu 570 × ok. 200, spadek 15%", "levelLow": -0.47, "levelHigh": -0.17, "src": "rys1 570, 15%; długość z pomiaru; poziomy wyliczone z 15% × 2,00 m", "conf": "pomiar", "note": "Projekt zostawia przy bramie ok. 17 cm różnicy do posadzki garażu ±0,00 – bez wyjaśnienia." }
+      ],
+      "groundLevel": -0.47
+    },
+
+    {
+      "id": "poddasze",
+      "name": "Poddasze",
+      "floorLevel": 3.03,
+      "wallBase": 2.86,
+      "wallBaseNote": "Ściany poddasza stoją na płycie stropu (+2,86), nie na posadzce; pas 2,86..3,03 to warstwy posadzki. rys4 B-B, C-C (wymiar 150 od płyty do +4,36).",
+      "ceilingHeight": 2.55,
+      "ceilingNote": "Sufit poziomy z płyt GK pod jętkami: 2,55 m nad posadzką (+5,58). rys4: spód jętek +5,68, okładzina 10 cm niżej.",
+      "ceiling": {
+        "flatHeight": 2.55,
+        "slopes": [
+          { "id": "skos-S", "side": "-y", "kneeWallFace": 0.25, "heightAtWall": 1.425, "risePerMeter": 0.70, "flatFrom": 1.857 },
+          { "id": "skos-N", "side": "+y", "kneeWallFace": 9.85, "heightAtWall": 1.425, "risePerMeter": 0.70, "flatFrom": 8.243 }
+        ],
+        "rule": "Wysokość pomieszczenia w punkcie (x, y): h = min(2,55; 1,425 + 0,70 · u), gdzie u = odległość w poziomie od wewnętrznego lica najbliższej ścianki kolankowej (y = 0,25 lub y = 9,85). Skosy biegną na całej długości domu; sufit płaski między y = 1,857 a y = 8,243. Wszystkie ściany poddasza stoją na płycie stropu (pole wallBase) i sięgają do tej powierzchni; z zewnątrz ścianki kolankowe i szczyty buduje się do spodu połaci (wierzch połaci z roof.formula minus roof.packageVertical).",
+        "checkpoints": [ { "u": 0.0, "h": 1.425 }, { "u": 0.68, "h": 1.90 }, { "u": 1.11, "h": 2.20 }, { "u": 1.607, "h": 2.55 } ],
+        "src": "rys4 C-C (pomiar linii okładziny skosu); rys2 etykiety h=140cm i h=220cm w pokoju 1/5",
+        "conf": "pomiar",
+        "note": "Projekt podaje tylko dwie etykiety (h=140, h=220); 1,425 m przy ściance i nachylenie 0,70 zmierzone z przekroju. Zależy od faktycznej grubości zabudowy skosu (wełna 30 cm + ruszt + GK)."
+      },
+      "kneeWall": { "masonryTop": 4.36, "aboveFloor": 1.33, "src": "rys4, rys15: 150 cm od płyty stropu", "conf": "pewne", "note": "Wierzch wieńca ścianki kolankowej (spód murłaty) – informacja konstrukcyjna. Od wewnątrz ścianka kończy się na skosie na wysokości 1,425 m; pas 1,33..1,425 to zabudowa nad wieńcem." },
+
+      "walls": [
+        { "id": "Z-W", "type": "ext", "rect": [0.00, 0.00, 0.25, 10.10], "label": "szczyt zachodni (lewa)", "src": "rys2 łańcuch lewy 20|25|261|12|310|12|365|25|20", "conf": "pewne" },
+        { "id": "Z-N", "type": "ext", "rect": [0.25, 9.85, 13.35, 10.10], "label": "ścianka kolankowa od ogrodu (górna)", "src": "rys2 łańcuch górny 20|25|223|12|245|25|411|12|382|25|20", "conf": "pewne" },
+        { "id": "Z-E", "type": "ext", "rect": [13.35, 0.00, 13.60, 10.10], "label": "szczyt wschodni (prawa)", "src": "rys2 łańcuch prawy 20|25|462|12|486|25|20", "conf": "pewne" },
+        { "id": "Z-S", "type": "ext", "rect": [0.25, 0.00, 13.35, 0.25], "label": "ścianka kolankowa od frontu (dolna)", "src": "rys2 łańcuch dolny 20|25|480|25|241|12|220|12|320|25|20", "conf": "pewne", "note": "Nad wnęką wejściową parteru stoi na belce B2." },
+        { "id": "N-1", "type": "int", "rect": [5.05, 0.25, 5.30, 9.85], "label": "nośna środkowa", "src": "rys2 łańcuchy górny i dolny (25 między 245 a 411 / 480 a 241)", "conf": "pewne" },
+        { "id": "D-1", "type": "part", "rect": [2.48, 7.24, 2.60, 9.85], "label": "łazienka 1/10 | garderoba 1/11", "src": "rys2 łańcuch górny 223|12|245", "conf": "pewne" },
+        { "id": "D-2", "type": "part", "rect": [0.25, 7.12, 5.05, 7.24], "label": "1/10, 1/11 | pokój 1/9", "src": "rys2 łańcuch lewy 261|12", "conf": "pewne" },
+        { "id": "D-3", "type": "part", "rect": [0.25, 3.90, 3.25, 4.02], "label": "pokój 1/9 | pokój 1/8", "src": "rys2 łańcuch lewy 310|12|365 i 45|300|12", "conf": "pewne" },
+        { "id": "D-4", "type": "part", "rect": [3.25, 3.40, 3.37, 4.84], "label": "wnęki 1/8, 1/9 | hol zachodni", "src": "rys2 45|300|12 i 82|12|50", "conf": "pewne" },
+        { "id": "D-5", "type": "part", "rect": [3.37, 4.72, 5.05, 4.84], "label": "hol zachodni | pokój 1/9", "src": "rys2 łańcuch 315|12|120|12|228|12", "conf": "pewne" },
+        { "id": "D-6", "type": "part", "rect": [3.37, 3.40, 5.05, 3.52], "label": "hol zachodni | pokój 1/8", "src": "rys2 łańcuch 315|12|120|12|228|12", "conf": "pewne" },
+        { "id": "D-7", "type": "part", "rect": [5.30, 6.80, 9.41, 6.92], "label": "pokój 1/3 | schody, korytarz", "src": "rys2 łańcuch 293|12|100|100|128|12|315", "conf": "pewne" },
+        { "id": "D-8", "type": "part", "rect": [9.41, 2.66, 9.53, 9.85], "label": "1/3, korytarz | pokoje 1/4, 1/5", "src": "rys2 łańcuch górny 411|12|382", "conf": "pewne" },
+        { "id": "D-9", "type": "part", "rect": [9.53, 5.11, 13.35, 5.23], "label": "pokój 1/4 | pokój 1/5", "src": "rys2 łańcuch prawy 462|12|486", "conf": "pewne" },
+        { "id": "D-10", "type": "part", "rect": [5.30, 3.40, 9.05, 3.52], "label": "korytarz | łazienka 1/7, pralnia 1/6", "src": "rys2 łańcuch 128|12|315", "conf": "pewne" },
+        { "id": "D-11a", "type": "part", "rect": [8.93, 3.52, 9.05, 3.88], "label": "obudowa komina K-C od korytarza (odcinek pionowy)", "src": "rys2 12|9|92|9|48|12; długość z pomiaru", "conf": "pomiar" },
+        { "id": "D-11b", "type": "part", "rect": [9.05, 3.76, 9.41, 3.88], "label": "obudowa komina K-C od korytarza (odcinek poziomy)", "src": "rys2 łańcuch 13|12|110", "conf": "pewne" },
+        { "id": "D-12", "type": "part", "rect": [7.71, 0.25, 7.83, 3.40], "label": "łazienka 1/7 | pralnia 1/6", "src": "rys2 łańcuch dolny 241|12|220", "conf": "pewne" },
+        { "id": "D-13", "type": "part", "rect": [9.41, 2.54, 10.03, 2.66], "label": "komin, korytarz | pokój 1/5 (odcinek poziomy)", "src": "rys2 łańcuch 110|40|201", "conf": "pewne" },
+        { "id": "D-14", "type": "part", "rect": [10.03, 0.25, 10.15, 2.66], "label": "pralnia 1/6 | pokój 1/5", "src": "rys2 łańcuch dolny 220|12|320", "conf": "pewne" }
+      ],
+
+      "openings": [
+        { "id": "OW1", "kind": "frenchWindow", "wall": "Z-W", "at": [4.88, 6.68], "width": 1.80, "height": 2.31, "sill": 0, "frame": "178/230", "panes": 2, "room": "1/9", "label": "okno do podłogi z balustradą szklaną", "src": "rys2 łańcuch 342|180|123|150|215, 178/230, 231; rys4 A-A 231|25; rys6", "conf": "pewne" },
+        { "id": "OW2", "kind": "frenchWindow", "wall": "Z-W", "at": [2.15, 3.65], "width": 1.50, "height": 2.31, "sill": 0, "frame": "148/230", "panes": 2, "room": "1/8", "label": "okno do podłogi z balustradą szklaną", "src": "rys2 łańcuch 342|180|123|150|215, 148/230, 231; rys6", "conf": "pewne" },
+        { "id": "OE1", "kind": "frenchWindow", "wall": "Z-E", "at": [5.95, 7.75], "width": 1.80, "height": 2.31, "sill": 0, "frame": "178/230", "panes": 2, "room": "1/4", "label": "okno do podłogi z balustradą szklaną", "src": "rys2 łańcuch 235|180|180|180|235, 178/230, 231; rys4 A-A; rys8", "conf": "pewne" },
+        { "id": "OE2", "kind": "frenchWindow", "wall": "Z-E", "at": [2.35, 4.15], "width": 1.80, "height": 2.31, "sill": 0, "frame": "178/230", "panes": 2, "room": "1/5", "label": "okno do podłogi z balustradą szklaną", "src": "rys2 łańcuch 235|180|180|180|235, 178/230, 231; rys8", "conf": "pewne" },
+
+        { "id": "PN1", "kind": "passage", "wall": "N-1", "at": [3.52, 4.72], "width": 1.20, "height": 2.40, "sill": 0, "between": ["1/2", "1/2"], "label": "przejście bez drzwi: korytarz – hol zachodni", "src": "rys2 120 / 240; rys12 wieniec W4 nad przejściem", "conf": "pewne", "note": "Zapis 120 / 240 = szerokość / wysokość, w tym samym układzie co 92 / 208 przy drzwiach; nad przejściem wieniec W4 ze spodem 2,40 m nad posadzką. Otwór w samym murze nośnym ma 132 cm (y 3,40..4,72) – 12 cm zajmuje ścianka D-6." },
+
+        { "id": "DP1", "kind": "door", "wall": "D-2", "at": [0.56, 1.48], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/9", "1/10"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 0.56, "swing": "-y", "src": "rys2 92/208 i 45|31|92|100|12|36", "conf": "pewne" },
+        { "id": "DP2", "kind": "door", "wall": "D-2", "at": [3.48, 4.40], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/9", "1/11"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 4.40, "swing": "-y", "src": "rys2 92/208 i 65", "conf": "pewne" },
+        { "id": "DP3", "kind": "door", "wall": "D-5", "at": [3.43, 4.35], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/2", "1/9"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 4.35, "swing": "+y", "src": "rys2 92/208 i 18|92|70|25", "conf": "pewne" },
+        { "id": "DP4", "kind": "door", "wall": "D-6", "at": [3.43, 4.35], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/2", "1/8"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 4.35, "swing": "-y", "src": "rys2 92/208 i 45|300|18|92|70|25", "conf": "pewne" },
+        { "id": "DP5", "kind": "door", "wall": "D-10", "at": [6.21, 7.13], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/2", "1/7"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 6.21, "swing": "+y", "src": "rys2 92/208 i 91|92", "conf": "pewne" },
+        { "id": "DP6", "kind": "door", "wall": "D-10", "at": [7.92, 8.84], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/2", "1/6"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 7.92, "swing": "+y", "src": "rys2 92/208 i 12|9|92|9|48|12", "conf": "pewne" },
+        { "id": "DP7", "kind": "door", "wall": "D-7", "at": [8.24, 9.16], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/2", "1/3"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 9.16, "swing": "+y", "src": "rys2 92/208 i 92|25|12", "conf": "pewne" },
+        { "id": "DP8", "kind": "door", "wall": "D-8", "at": [5.81, 6.73], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/2", "1/4"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 5.81, "swing": "+x", "src": "rys2 92/208 i 92|58|12|18|92|13|12|110|40|201", "conf": "pewne" },
+        { "id": "DP9", "kind": "door", "wall": "D-8", "at": [4.01, 4.93], "width": 0.92, "height": 2.08, "sill": 0, "mark": "D80", "between": ["1/2", "1/5"], "leaf": 0.80, "hingeOffset": 0.06, "hinge": 4.93, "swing": "+x", "src": "rys2 92/208 i 92|58|12|18|92|13|12|110|40|201", "conf": "pewne" }
+      ],
+
+      "frenchBalconies": { "appliesTo": ["OW1", "OW2", "OE1", "OE2"], "glassFrom": 0.15, "glassTo": 0.90, "sideOverhang": 0.10, "position": "na zewnątrz, 5–9 cm przed licem ocieplenia", "src": "rys6, rys8 (elewacje szczytowe)", "conf": "pomiar", "note": "0,15..0,90 m nad posadzką to obrys balustrady z ramą (sama tafla ok. 0,26..0,81); balustrada jest szersza od otworu o ok. 10 cm z każdej strony." },
+
+      "roofWindows": [
+        { "id": "OP1", "slope": "skos-N", "x": [1.545, 2.325], "plan": [1.545, 8.885, 2.325, 9.85], "width": 0.78, "length": 1.18, "zBottom": 4.98, "zTop": 5.66, "room": "1/10", "src": "rys2 78/118; rys3; rys7", "conf": "pomiar" },
+        { "id": "OP2", "slope": "skos-N", "x": [6.21, 6.99], "plan": [6.21, 8.885, 6.99, 9.85], "width": 0.78, "length": 1.18, "zBottom": 4.98, "zTop": 5.66, "room": "1/3", "src": "rys2 78/118; rys3; rys7", "conf": "pomiar" },
+        { "id": "OP3", "slope": "skos-N", "x": [7.115, 7.895], "plan": [7.115, 8.885, 7.895, 9.85], "width": 0.78, "length": 1.18, "zBottom": 4.98, "zTop": 5.66, "room": "1/3", "src": "rys2 78/118; rys3; rys7", "conf": "pomiar" },
+        { "id": "OP4", "slope": "skos-S", "x": [6.24, 7.02], "plan": [6.24, 0.25, 7.02, 1.215], "width": 0.78, "length": 1.18, "zBottom": 4.98, "zTop": 5.66, "room": "1/7", "src": "rys2 78/118; rys3; rys5", "conf": "pomiar" },
+        { "id": "OP5", "slope": "skos-S", "x": [8.04, 8.82], "plan": [8.04, 0.25, 8.82, 1.215], "width": 0.78, "length": 1.18, "zBottom": 4.98, "zTop": 5.66, "room": "1/6", "src": "rys2 78/118; położenie wg rys3 i rys15", "conf": "pomiar", "note": "Projekt jest tu niespójny: rzut poddasza (rys. 2) i elewacja (rys. 5) rysują okno 7,5 cm dalej w prawo (x 8,115..8,895), ale tam wypada krokiew z rys. 15 (x 8,82..8,90). Przyjęto rzut dachu i więźbę – okno między krokwiami. Do potwierdzenia z wykonawcą." }
+      ],
+      "roofWindowsNote": "Wymiar 78 × 118 jest pewny, położenie zmierzone z rysunku (projekt nie wymiaruje osadzenia). 'plan' to rzut okna; 118 cm po skosie 35° daje 96,5 cm w rzucie. Okno leży w płaszczyźnie połaci: dolna krawędź na +4,98 (zBottom, 1,95 m nad posadzką), górna na +5,66 (zTop, 2,63 m) – rys. 5 i rys. 7. Okładzina skosu pod tymi krawędziami jest na 1,43 m i 2,10 m, więc szpalet przechodzi przez pakiet dachu ok. 0,52 m w pionie; kształt szpaletu nie jest w projekcie określony (założenie: prostopadły do połaci u góry i u dołu).",
+      "roofWindowReveal": { "shape": "prostopadły do połaci", "conf": "zalozenie" },
+
+      "ceilingHatches": [
+        { "id": "WS", "rect": [5.495, 3.79, 6.695, 4.59], "width": 1.20, "depth": 0.80, "room": "1/2", "label": "wyłaz stropowy na strych 80 × 120", "src": "rys2 legenda WS; położenie wg rys15 (między jętkami, w wymianach)", "conf": "pomiar", "note": "Rys. 2 rysuje wyłaz 13 cm bliżej ściany nośnej (x 5,365..6,565), ale tam wypada krokiew z jętką; przyjęto położenie z rysunku więźby." }
+      ],
+
+      "columns": [
+        { "id": "C2-N1", "rect": [0.25, 9.85, 0.50, 10.10], "embedded": true },
+        { "id": "C2-N2", "rect": [1.855, 9.85, 2.105, 10.10], "embedded": true },
+        { "id": "C2-N3", "rect": [3.465, 9.85, 3.715, 10.10], "embedded": true },
+        { "id": "C2-N4", "rect": [6.675, 9.85, 6.925, 10.10], "embedded": true },
+        { "id": "C2-N5", "rect": [8.28, 9.85, 8.53, 10.10], "embedded": true },
+        { "id": "C2-N6", "rect": [9.885, 9.85, 10.135, 10.10], "embedded": true },
+        { "id": "C2-N7", "rect": [11.495, 9.85, 11.745, 10.10], "embedded": true },
+        { "id": "C2-N8", "rect": [13.10, 9.85, 13.35, 10.10], "embedded": true },
+        { "id": "C2-S1", "rect": [0.25, 0.00, 0.50, 0.25], "embedded": true },
+        { "id": "C2-S2", "rect": [1.855, 0.00, 2.105, 0.25], "embedded": true },
+        { "id": "C2-S3", "rect": [3.465, 0.00, 3.715, 0.25], "embedded": true },
+        { "id": "C2-S4", "rect": [6.675, 0.00, 6.925, 0.25], "embedded": true },
+        { "id": "C2-S5", "rect": [8.28, 0.00, 8.53, 0.25], "embedded": true },
+        { "id": "C2-S6", "rect": [9.885, 0.00, 10.135, 0.25], "embedded": true },
+        { "id": "C2-S7", "rect": [11.495, 0.00, 11.745, 0.25], "embedded": true },
+        { "id": "C2-S8", "rect": [13.10, 0.00, 13.35, 0.25], "embedded": true },
+        { "id": "C2-D8", "rect": [9.41, 7.55, 9.53, 7.85], "embedded": true },
+        { "id": "C2-D12", "rect": [7.71, 2.25, 7.83, 2.55], "embedded": true },
+        { "id": "C2-D14", "rect": [10.03, 2.26, 10.15, 2.66], "embedded": true }
+      ],
+      "columnsNote": "Słupki żelbetowe C2 w grubości ścian – niewidoczne we wnętrzu, nie tworzą brył. Położenie słupków w ściankach kolankowych z pomiaru: łańcuch 25|25|136|25|136|25|296|25|136|… z rys. 2 daje 1362 zamiast 1360, więc nie da się go odtworzyć co do centymetra.",
+
+      "chimneys": [
+        { "id": "K-A", "rect": [2.60, 8.21, 2.96, 9.21], "room": "1/11", "label": "komin SIH20L + 4 kanały wentylacyjne (blok 36×100)", "src": "rys2 łańcuch 64|100 i 36", "conf": "pewne" },
+        { "id": "K-B", "rect": [5.05, 7.83, 5.30, 8.51], "embeddedInWall": "N-1", "label": "4 kanały wentylacyjne w grubości ściany (25×68)", "src": "rys2 68|91", "conf": "pewne" },
+        { "id": "K-C", "rect": [9.05, 2.54, 9.41, 3.76], "room": null, "label": "komin kominka SIH20 + przewód PC + kanały wentylacyjne (blok 36×122)", "src": "rys2 36 i 86; długość 122 z pomiaru", "conf": "pomiar", "note": "Stoi między korytarzem, pralnią i ścianką D-8; od korytarza obudowany ściankami D-11a/b. Rząd kanałów y 2,54..2,79 zaczyna się dopiero na płycie stropu (na parterze blok ma y 2,79..3,76).", "segments": [ { "rect": [9.05, 2.54, 9.41, 3.40], "from": 2.86, "throughRoof": true, "top": 8.39, "src": "rys2 (86), rys3", "conf": "pomiar" }, { "rect": [9.05, 3.40, 9.41, 3.76], "from": 2.86, "top": 5.58, "conf": "zalozenie", "note": "Przewód PC (ciepłe powietrze z kominka) nie wychodzi ponad dach; wierzch przyjęty na sufit poddasza." } ] }
+      ],
+
+      "rooms": [
+        { "id": "1/2", "name": "Korytarz", "polygon": [[3.37, 4.72], [5.30, 4.72], [5.30, 4.80], [7.92, 4.80], [7.92, 6.80], [9.41, 6.80], [9.41, 3.88], [8.93, 3.88], [8.93, 3.52], [3.37, 3.52]], "areaProject": 10.43, "usableAreaProject": 10.43, "floorProject": "klepka", "conf": "wyliczone", "note": "Razem z holem zachodnim (168 × 120) i przejściem w ścianie nośnej; bez otworu klatki schodowej." },
+        { "id": "1/3", "name": "Pokój", "polygon": [[5.30, 6.92], [9.41, 6.92], [9.41, 9.85], [5.30, 9.85]], "areaProject": 11.51, "usableAreaProject": 8.57, "floorProject": "klepka", "conf": "pewne", "areaDiffAccepted": "Rysunek wymiaruje pokój 411 × 293 = 12,04 m²; tabela projektu podaje 11,51 bez wyjaśnienia. Przyjęto wymiary z rysunku." },
+        { "id": "1/4", "name": "Pokój", "polygon": [[9.53, 5.23], [13.35, 5.23], [13.35, 9.85], [9.53, 9.85]], "areaProject": 17.65, "usableAreaProject": 14.14, "floorProject": "klepka", "conf": "pewne" },
+        { "id": "1/5", "name": "Pokój", "polygon": [[10.15, 0.25], [13.35, 0.25], [13.35, 5.11], [9.53, 5.11], [9.53, 2.66], [10.15, 2.66]], "areaProject": 17.04, "usableAreaProject": 14.08, "floorProject": "klepka", "conf": "pewne" },
+        { "id": "1/6", "name": "Pralnia", "polygon": [[7.83, 0.25], [10.03, 0.25], [10.03, 2.54], [9.05, 2.54], [9.05, 3.40], [7.83, 3.40]], "areaProject": 6.09, "usableAreaProject": 4.69, "floorProject": "terakota", "conf": "pewne" },
+        { "id": "1/7", "name": "Łazienka", "polygon": [[5.30, 0.25], [7.71, 0.25], [7.71, 3.40], [5.30, 3.40]], "areaProject": 7.59, "usableAreaProject": 5.79, "floorProject": "terakota", "conf": "pewne" },
+        { "id": "1/8", "name": "Pokój", "polygon": [[0.25, 0.25], [5.05, 0.25], [5.05, 3.40], [3.25, 3.40], [3.25, 3.90], [0.25, 3.90]], "areaProject": 16.62, "usableAreaProject": 12.95, "floorProject": "klepka", "conf": "pewne" },
+        { "id": "1/9", "name": "Pokój", "polygon": [[0.25, 4.02], [3.25, 4.02], [3.25, 4.84], [5.05, 4.84], [5.05, 7.12], [0.25, 7.12]], "areaProject": 13.40, "usableAreaProject": 13.40, "floorProject": "klepka", "conf": "pewne" },
+        { "id": "1/10", "name": "Łazienka", "polygon": [[0.25, 7.24], [2.48, 7.24], [2.48, 9.85], [0.25, 9.85]], "areaProject": 5.82, "usableAreaProject": 4.62, "floorProject": "terakota", "conf": "pewne" },
+        { "id": "1/11", "name": "Garderoba", "polygon": [[2.60, 7.24], [5.05, 7.24], [5.05, 9.85], [2.60, 9.85]], "areaProject": 6.03, "usableAreaProject": 4.69, "floorProject": "klepka", "conf": "pewne" }
+      ],
+      "roomsNote": "areaProject = powierzchnia netto z tabeli na rys. 2 (cała podłoga, także pod skosem); usableAreaProject = powierzchnia użytkowa z tej samej tabeli. Pozycja 1/1 Schody (2,71 m² w tabeli) to otwór klatki – patrz stairVoid.",
+
+      "stairVoid": {
+        "stairs": "S1",
+        "rect": [5.30, 4.80, 7.92, 6.80],
+        "arrival": { "edge": [[7.92, 4.80], [7.92, 5.80]], "note": "Bieg górny wychodzi na korytarz przez krawędź x = 7,92." },
+        "balustrades": [
+          { "from": [5.30, 4.80], "to": [7.92, 4.80], "type": "level", "base": 3.03, "label": "wzdłuż korytarza", "src": "rys2 podwójna linia na krawędzi otworu", "conf": "pomiar" },
+          { "from": [7.92, 5.80], "to": [7.92, 6.80], "type": "level", "base": 3.03, "label": "nad biegiem dolnym", "conf": "zalozenie", "note": "Na rys. 2 nienarysowana, ale potrzebna – pod tą krawędzią zaczyna się bieg dolny." },
+          { "from": [6.30, 5.80], "to": [7.92, 5.80], "type": "raked", "follows": "S1.parts[2]", "baseFrom": 2.02, "baseTo": 3.03, "label": "między biegami, po skosie biegu górnego (dusza ok. 14 cm)", "src": "rys2", "conf": "zalozenie" }
+        ],
+        "balustradeHeight": 0.90,
+        "balustradeConf": "pomiar",
+        "balustradeSrc": "rys4 A-A: słupek 0,90 m na krawędzi stropu",
+        "note": "Pozostałe dwie krawędzie otworu to ściany: N-1 (x = 5,30) i D-7 (y = 6,80)."
+      }
+    }
+  ],
+
+  "roof": {
+    "type": "dwuspadowy symetryczny",
+    "pitchDeg": 35,
+    "slope": 0.7002,
+    "ridge": { "axis": "x", "y": 5.05, "top": 8.34, "rafterUnderside": 7.99 },
+    "overhang": 1.00,
+    "planRect": [-1.00, -1.00, 14.60, 11.10],
+    "eaves": { "top": 4.10, "rafterUnderside": 3.75 },
+    "packageVertical": 0.35,
+    "formula": "Wierzch połaci: z = 8,34 − |y − 5,05| · 0,7002. Spód krokwi 0,35 m niżej (w pionie). Kalenica biegnie wzdłuż osi x.",
+    "gables": "Ściany szczytowe Z-W i Z-E są z zewnątrz wymurowane do spodu połaci; wysięg dachu poza szczyty 1,00 m od muru.",
+    "atticAbove": { "ceilingTop": 5.93, "note": "Nad sufitem poddasza nieużytkowy strych (jętki, płatwie w osiach y = 2,40 i y = 7,70). Wejście wyłazem WS." },
+    "chimneysAboveRoof": [
+      { "chimney": "K-A", "rect": [2.55, 8.16, 3.01, 9.26], "top": 7.34, "src": "rys3 46×110; rys4", "conf": "pomiar" },
+      { "chimney": "K-B", "rect": [5.00, 7.78, 5.35, 8.56], "top": 7.60, "src": "rys3 35×78; rys4", "conf": "pomiar" },
+      { "chimney": "K-C", "rect": [9.00, 2.49, 9.46, 3.45], "shaft": [9.05, 2.54, 9.41, 3.40], "top": 8.39, "src": "rys3 46×96; rys4", "conf": "pomiar" }
+    ],
+    "roofHatch": { "id": "WD", "plan": [1.57, 5.21, 2.25, 6.01], "size": "68 × 98", "note": "Wyłaz dachowy nad strychem przy kalenicy – niewidoczny z pomieszczeń.", "src": "rys3", "conf": "pomiar" },
+    "covering": "blachodachówka na łatach i kontrłatach, papa, deskowanie pełne, krokwie 8 × 16 cm",
+    "chimneyCaps": { "thickness": 0.075, "overhang": 0.07, "note": "Rzędne 'top' to wierzch czap; trzon kończy się 7,5 cm niżej (rys. 3, rys. 4).", "conf": "pomiar" },
+    "simplified": true,
+    "src": "rys3 (rzut dachu), rys4 (przekroje, rzędne +8,34 i kąt 35°), rys15 (więźba)",
+    "conf": "pewne",
+    "note": "Model uproszczony: dwie płaskie połacie o grubości pakietu 35 cm, bez więźby, rynien i obróbek. Rzędne okapu (+4,10 / +3,75) wyliczone z kalenicy i kąta."
+  },
+
+  "assumptions": [
+    { "id": "A1", "text": "Wymiary surowe z projektu, bez tynków (ok. 1,5 cm na stronę) – decyzja inwestora.", "affects": "wszystkie ściany" },
+    { "id": "A2", "text": "Sufit parteru bez sufitów podwieszanych: 2,70 m, podciąg B1 wystaje 24 cm – decyzja inwestora.", "affects": "parter" },
+    { "id": "A3", "text": "Przestrzeń pod schodami otwarta, należy do korytarza 0/2 – decyzja inwestora.", "affects": "0/2, S1" },
+    { "id": "A4", "text": "Balustrada schodów 0,90 m – wysokość i przebieg przyjęte, projekt ich nie podaje.", "affects": "S1" },
+    { "id": "A5", "text": "Pas pod podciągiem: przy korytarzu (0,25 × 3,04 m) przypisany do salonu, przy kuchni (0,25 × 2,80 m) do kuchni – tak zgadzają się powierzchnie z tabelą projektu; granica korytarz/schody umowna.", "affects": "0/2, 0/5, 0/6" },
+    { "id": "A6", "text": "Podział drzwi wejściowych: skrzydło 100 cm + doświetle 50 cm z lewej (z pomiaru rysunku).", "affects": "O7" },
+    { "id": "A7", "text": "Otwory okienne modelowane jako otwór w murze (np. 180 × 150, parapet 91); wymiar stolarki (178/145) zapisany jako atrybut 'frame'.", "affects": "okna" },
+    { "id": "A8", "text": "Kanały wentylacyjne pod sufitem, przepusty w ścianach i nawiew kominka pod posadzką pominięte. Przepusty wg rys. 1: W2a x 2,80..2,91; D1 y 8,51..8,67; W3 y 2,85..2,98 (kanał z łazienki biegnie pod sufitem przez przejście P1 do komina K-C – może wymagać zabudowy).", "affects": "parter" },
+    { "id": "A9", "text": "Bok biegu dolnego schodów otwarty (projekt nie rysuje tam ściany); płyta schodów 12 cm z pomiaru przekroju.", "affects": "S1" },
+    { "id": "A10", "text": "Wysokość stopnia w bryle = 3,03 / 18 = 16,83 cm, żeby schody kończyły się równo z posadzką poddasza.", "affects": "S1" },
+    { "id": "A11", "text": "Podjazd: z −0,47 do −0,17 przy elewacji (15% na 2,00 m); przy bramie zostaje ok. 17 cm do posadzki garażu.", "affects": "podjazd, 0/9" },
+    { "id": "A12", "text": "Położenie ram okien w grubości muru nie jest zwymiarowane; dla okna narożnego ramy przy zewnętrznym licu (z rysunku), dla pozostałych do ustalenia w etapie 3.", "affects": "okna" },
+    { "id": "A13", "text": "Skrzydła drzwi wewnętrznych 80 cm (D80) i 60 cm (D60) w otworach 92 i 72 cm; ościeżnica 6 cm z pomiaru.", "affects": "drzwi" },
+    { "id": "A14", "text": "Skosy poddasza: 1,425 m przy ściance kolankowej i przyrost 0,70 m na metr – z pomiaru przekroju; projekt podaje tylko etykiety h=140 i h=220. Sufit płaski 2,55 m.", "affects": "poddasze" },
+    { "id": "A15", "text": "Belka B2 nad wnęką wejściową: spód konstrukcyjny +2,51 wyliczony, widoczna krawędź wnęki +2,41 z pomiaru elewacji; projekt nie podaje tej rzędnej ani ocieplenia sufitu wnęki.", "affects": "B2, wnęka wejściowa" },
+    { "id": "A16", "text": "Okna dachowe 78 × 118: położenie z pomiaru rysunków. W połaci dół na +4,98 (1,95 m nad posadzką), góra na +5,66; okładzina skosu pod nimi na 1,43 i 2,10 m. Kształt szpaletu przyjęty (projekt go nie pokazuje).", "affects": "OP1–OP5" },
+    { "id": "A21", "text": "Okno dachowe OP5 (pralnia) i wyłaz WS: rysunki projektu różnią się o 7,5 cm i 13 cm; przyjęto położenie z rzutu dachu i więźby (między krokwiami / jętkami), nie z rzutu poddasza.", "affects": "OP5, WS" },
+    { "id": "A22", "text": "Komin K-C: część z przewodem PC (36 × 36 od strony korytarza) kończy się na suficie poddasza; ponad dach wychodzi tylko część 36 × 86.", "affects": "K-C" },
+    { "id": "A17", "text": "Pokój 1/3: przyjęto wymiary z rysunku 411 × 293 (12,04 m²), tabela projektu podaje 11,51 m².", "affects": "1/3" },
+    { "id": "A18", "text": "Balustrady przy otworze klatki na poddaszu: wzdłuż korytarza, nad biegiem dolnym i między biegami, wysokość 0,90 m – przebieg częściowo z rysunku, wysokość przyjęta.", "affects": "S1, 1/2" },
+    { "id": "A19", "text": "Dach uproszczony do dwóch płaskich połaci 35° z okapem 1,00 m; bez więźby, rynien i obróbek. Kominy ponad dachem wg rys. 3.", "affects": "dach" },
+    { "id": "A20", "text": "Kanały wentylacyjne łazienek poddasza (przepusty w ściankach D-1 y 8,51..8,65 i D-12 y 2,58..2,76) oraz prostokąty z przekątnymi (szafy wnękowe z projektu) nie należą do geometrii; szafy trafią do mebli startowych.", "affects": "poddasze" }
+  ]
+}

@@ -1,0 +1,196 @@
+/* Panel „Warianty” (prefiks klas: war-). Kolory i wymiary ze zmiennych rdzenia (src/ui/styles.css). */
+
+.war {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.war-status {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.war-status.is-warning {
+  color: #a23b1c;
+  font-weight: 600;
+}
+
+.war-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.war-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.war-item.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* cały lewy obszar wiersza przełącza wariant */
+.war-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.war-pick:active {
+  background: #eeeeea;
+}
+
+.war-pick:focus-visible,
+.war-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.war-mark {
+  flex: 0 0 22px;
+  display: flex;
+  height: 22px;
+  color: var(--accent);
+}
+
+.war-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.war-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.war-meta {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.war-icon {
+  flex: 0 0 var(--hit);
+  width: var(--hit);
+  height: var(--hit);
+  color: var(--muted);
+}
+
+.war-icon:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* wiersz w trybie zmiany nazwy / potwierdzenia usunięcia */
+.war-item--form {
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border-color: var(--accent);
+}
+
+.war-input {
+  flex: 1 1 140px;
+  min-width: 0;
+  min-height: var(--hit);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 16px; /* 16 px: iOS nie powiększa strony po wejściu w pole */
+}
+
+.war-question {
+  flex: 1 1 100%;
+  padding: 2px 4px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.war-head {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.war-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.war-btn {
+  flex: 1 1 auto;
+  padding: 0 14px;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+
+.war-item--form .war-btn {
+  flex: 0 0 auto;
+}
+
+.war-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.war-btn--danger {
+  background: #b3261e;
+  border-color: #b3261e;
+  color: #fff;
+}
+
+/* pole wyboru pliku jest niewidoczne – otwiera je przycisk „Importuj z pliku…” */
+.war-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.war-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}

@@ -1,0 +1,667 @@
+/* Interfejs modelu 3D – najpierw telefon (375 px), potem szersze ekrany.
+   Cele dotykowe mają co najmniej 44 px; odstępy uwzględniają safe-area (wcięcie ekranu, pasek gestów). */
+
+:root {
+  --bg: rgba(250, 250, 248, 0.94);
+  --fg: #1f2327;
+  --muted: #666c73;
+  --line: #d9d8d3;
+  --accent: #2f6f5e;
+  --accent-fg: #ffffff;
+  --hit: 44px;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.16);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--fg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden; /* bez przewijania strony – cały ekran to model */
+  overscroll-behavior: none;
+  background: #cfe3f2;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overflow: clip; /* clip: nie da się przewinąć nawet programowo (fokus na schowanym panelu) */
+}
+
+#scena {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none; /* gesty obsługuje sterowanie kamerą */
+  outline: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* klikalne są tylko elementy interfejsu, reszta przepuszcza dotyk do modelu */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#ui > * {
+  pointer-events: auto;
+  touch-action: manipulation; /* bez powiększania strony podwójnym dotknięciem */
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------- pasek górny */
+
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(var(--safe-t) + 4px) calc(var(--safe-r) + 8px) 6px calc(var(--safe-l) + 8px);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.topbar__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.topbar__title {
+  /* nazwa oddaje miejsce przyciskom: skraca się wielokropkiem, a przyciski nigdy nie przechodzą do drugiego rzędu */
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar__actions,
+.topbar__extra {
+  display: flex;
+  flex-wrap: nowrap; /* pasek ma najwyżej dwa rzędy: [nazwa + przyciski] i [kondygnacja + tryb widoku] */
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.topbar__actions {
+  flex: 0 0 auto;
+}
+
+.topbar__row--views {
+  gap: 6px;
+}
+
+.topbar__row--views .seg {
+  flex: 1 1 0;
+}
+
+/* kondygnacje mają dłuższe napisy niż tryby (ikona + krótki podpis) */
+.topbar__row--views .seg:first-child {
+  flex: 1.25 1 0;
+}
+
+/* ---------------------------------------------------------------- przyciski */
+
+.btn {
+  min-width: var(--hit);
+  min-height: var(--hit);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+}
+
+.btn:active {
+  background: #eeeeea;
+}
+
+.btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btn:focus-visible,
+.seg__btn:focus-visible,
+.menu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn--icon {
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+/* przycisk paska: ikona nad podpisem (telefon) */
+.btn--action {
+  flex-direction: column;
+  gap: 0;
+  padding: 2px 6px;
+  min-width: 52px;
+}
+
+.btn--action .ico {
+  display: flex;
+  height: 22px;
+}
+
+.btn--action .ico:empty {
+  display: none;
+}
+
+.btn--action .lbl {
+  font-size: 10.5px;
+  line-height: 1.25;
+  white-space: nowrap;
+  max-width: 76px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn--text .lbl {
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------- przełączniki segmentowe */
+
+.seg {
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.seg__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--hit);
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 2px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.seg__btn:first-child {
+  border-left: 0;
+}
+
+.seg__btn .ico {
+  display: flex;
+  height: 22px;
+}
+
+.seg__btn .lbl {
+  font-size: 10.5px;
+}
+
+.seg__btn.is-active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.seg__btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- lista pomieszczeń */
+
+.menu {
+  position: absolute;
+  left: calc(var(--safe-l) + 8px);
+  right: calc(var(--safe-r) + 8px);
+  top: 110px; /* nadpisywane z JS: tuż pod przyciskiem */
+  max-height: min(62vh, 520px);
+  display: none;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  z-index: 30;
+}
+
+.menu.is-open {
+  display: flex;
+}
+
+.menu__head {
+  padding: 10px 14px 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.menu__list {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: 6px;
+}
+
+.menu__group {
+  padding: 8px 14px 2px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.menu__item {
+  width: 100%;
+  min-height: var(--hit);
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.menu__item:active,
+.menu__item:hover {
+  background: #f1f1ee;
+}
+
+.menu__id {
+  flex: 0 0 38px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.menu__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu__meta {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- panel funkcji (arkusz od dołu) */
+
+.panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* arkusz zajmuje najwyżej połowę ekranu – model nad nim zostaje widoczny; treść przewija się w .panel__body */
+  max-height: 50vh;
+  max-height: 50dvh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+  transform: translateY(105%);
+  transition: transform 0.22s ease;
+  visibility: hidden;
+  z-index: 20;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.panel.is-open {
+  transform: none;
+  visibility: visible;
+}
+
+.panel__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px calc(var(--safe-r) + 6px) 4px calc(var(--safe-l) + 16px);
+  border-bottom: 1px solid var(--line);
+}
+
+.panel__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 12px calc(var(--safe-r) + 16px) calc(var(--safe-b) + 16px) calc(var(--safe-l) + 16px);
+}
+
+/* ---------------------------------------------------------------- joystick */
+
+.joystick {
+  position: absolute;
+  left: calc(var(--safe-l) + 18px);
+  /* nad otwartym arkuszem dolnym (--panel-h ustawia panel.js), ale nie wyżej niż pod paskiem górnym */
+  bottom: min(calc(var(--panel-h, 0px) + var(--safe-b) + 22px), calc(100% - var(--topbar-h, 110px) - 132px));
+  transition: bottom 0.22s ease;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.34);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.22);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+#ui > .joystick {
+  touch-action: none; /* gałkę obsługujemy sami – przeglądarka nie może przejąć gestu */
+}
+
+.joystick.is-visible {
+  display: flex;
+}
+
+.joystick__knob {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.joystick.is-active .joystick__knob {
+  background: #fff;
+}
+
+/* ---------------------------------------------------------------- komunikaty */
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 18px);
+  transform: translate(-50%, 12px);
+  max-width: min(92vw, 560px);
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(28, 31, 35, 0.86);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none !important;
+  z-index: 40;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* w spacerze na telefonie komunikat nie może zasłaniać joysticka */
+html[data-view='walk'] .toast {
+  bottom: calc(var(--safe-b) + 160px);
+}
+
+.fatal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background: #f4f4f1;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- telefon: przyciski paska jako same ikony */
+
+/* Podpis jest ukryty, nazwę przycisku niesie aria-label / title (ustawia topbar.js).
+   Przycisk bez ikony (.btn--text) zachowuje podpis – inaczej byłby pusty. */
+@media (max-width: 719px) {
+  .btn--action:not(.btn--text) {
+    min-width: var(--hit);
+    padding: 0;
+  }
+  .btn--action:not(.btn--text) .lbl {
+    display: none;
+  }
+}
+
+@media (max-width: 339px) {
+  .topbar__title {
+    display: none;
+  }
+  .topbar__actions {
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+}
+
+/* ---------------------------------------------------------------- szersze ekrany */
+
+@media (min-width: 720px) {
+  .btn--action {
+    flex-direction: row;
+    gap: 6px;
+    padding: 0 12px;
+  }
+  .btn--action .lbl {
+    font-size: 13px;
+    max-width: 150px; /* długa nazwa aktywnego wariantu nie rozpycha paska */
+  }
+  .seg__btn {
+    flex-direction: row;
+    gap: 6px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+  .seg__btn .lbl {
+    font-size: 13px;
+  }
+  .topbar__row--views .seg {
+    flex: 0 1 auto;
+  }
+  .menu {
+    left: auto;
+    right: var(--anchor-right, 8px);
+    width: 340px;
+  }
+  html[data-view='walk'] .toast {
+    bottom: calc(var(--safe-b) + 18px);
+  }
+}
+
+@media (min-width: 1360px) {
+  /* jeden rząd: nazwa | kondygnacja | tryb | przyciski (próg dobrany do pięciu przycisków z podpisami) */
+  .topbar {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 4px;
+  }
+  .topbar__row--main {
+    display: contents;
+  }
+  .topbar__title {
+    flex: 0 1 auto;
+    order: 1;
+    font-size: 16px;
+  }
+  .topbar__row--views {
+    order: 2;
+    flex: 1 1 auto;
+    gap: 12px;
+  }
+  .topbar__actions {
+    order: 3;
+    flex-wrap: nowrap;
+  }
+}
+
+@media (min-width: 900px) {
+  /* panel funkcji z prawej strony, pod paskiem */
+  .panel {
+    left: auto;
+    top: var(--topbar-h, 60px);
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    max-height: none;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+    box-shadow: -4px 0 18px rgba(0, 0, 0, 0.14);
+    transform: translateX(105%);
+  }
+}
+
+/* Telefon poziomo (np. 812 × 375): każdy piksel wysokości jest cenny – pasek w jednym rzędzie bez nazwy,
+   przyciski zwarte (ikona nad podpisem, jak w pionie), panel funkcji z boku zamiast od dołu.
+   Reguła stoi po regułach szerokości, bo ma je nadpisać. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .topbar {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding-top: calc(var(--safe-t) + 2px);
+    padding-bottom: 2px;
+  }
+  .topbar__row--main {
+    display: contents;
+  }
+  .topbar__title {
+    display: none;
+  }
+  .topbar__row--views {
+    order: 2;
+    flex: 1 1 auto;
+    gap: 8px;
+  }
+  .topbar__row--views .seg,
+  .topbar__row--views .seg:first-child {
+    flex: 1 1 auto;
+  }
+  .topbar__actions {
+    order: 3;
+    flex: 0 1 auto;
+  }
+  .btn--action {
+    flex-direction: column;
+    gap: 0;
+    padding: 2px 6px;
+  }
+  .btn--action .lbl {
+    font-size: 10.5px;
+    max-width: 76px;
+  }
+  /* jak na telefonie w pionie: same ikony */
+  .btn--action:not(.btn--text) {
+    min-width: var(--hit);
+    padding: 0;
+  }
+  .btn--action:not(.btn--text) .lbl {
+    display: none;
+  }
+  .seg__btn {
+    flex-direction: column;
+    gap: 0;
+    padding: 2px 4px;
+    font-size: 12px;
+  }
+  .seg__btn .lbl {
+    font-size: 10.5px;
+  }
+  .panel {
+    left: auto;
+    top: var(--topbar-h, 52px);
+    right: 0;
+    bottom: 0;
+    width: calc(min(320px, 46vw) + var(--safe-r));
+    max-height: none;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+    box-shadow: -4px 0 18px rgba(0, 0, 0, 0.14);
+    transform: translateX(105%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .toast,
+  .joystick {
+    transition: none;
+  }
+}

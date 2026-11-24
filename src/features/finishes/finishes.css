@@ -1,0 +1,425 @@
+/* Panel wykończeń (prefiks fin-). Korzysta ze zmiennych i klas rdzenia (.btn, .seg) z src/ui/styles.css.
+   Cele dotykowe mają co najmniej 44 px (--hit); pola tekstowe 16 px, żeby iOS nie powiększał strony. */
+
+.fin {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.35;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.fin-block,
+.fin-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fin-options {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.fin-options__title {
+  font-weight: 650;
+  font-size: 15px;
+}
+
+.fin-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fin-info__main {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.fin-info__main strong {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.fin-info__est,
+.fin-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.fin-label {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* przełączniki: w panelu napisy w jednym rzędzie i nieco większe niż w pasku górnym */
+.fin-seg .seg__btn {
+  flex-direction: row;
+  font-size: 13px;
+  padding: 2px 6px;
+  white-space: normal;
+  text-align: center;
+}
+
+.fin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.fin-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fin-grow {
+  flex: 1 1 auto;
+}
+
+.fin-input {
+  width: 72px;
+  min-height: var(--hit);
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.fin-input--text {
+  width: 100%;
+  text-align: left;
+}
+
+.fin-input:focus-visible,
+.fin-swatch:focus-visible .fin-swatch__color,
+.fin-dot:focus-visible,
+.fin-mat:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- pigułki (formaty, kategorie, fugi) */
+
+.fin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fin-chips--scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 2px 16px;
+}
+
+.fin-chips--scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.fin-chip {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- farba */
+
+.fin-color {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--hit);
+  cursor: pointer;
+}
+
+.fin-color__input {
+  flex: 0 0 auto;
+  width: 56px;
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+}
+
+.fin-color__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fin-color__hex {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fin-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 8px 6px;
+}
+
+.fin-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fin-swatch__color {
+  height: var(--hit);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 8px;
+}
+
+.fin-swatch__name {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.fin-swatch.is-active .fin-swatch__color,
+.fin-dot.is-active {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.fin-swatch.is-active .fin-swatch__name {
+  color: var(--fg);
+  font-weight: 650;
+}
+
+.fin-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 2px;
+}
+
+.fin-dot {
+  flex: 0 0 auto;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.fin-dot--picker {
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+/* ---------------------------------------------------------------- materiały */
+
+.fin-mats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px 8px;
+}
+
+.fin-mats--row {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 3px 16px;
+}
+
+.fin-mats--row::-webkit-scrollbar {
+  display: none;
+}
+
+.fin-mats--row .fin-mat {
+  flex: 0 0 92px;
+}
+
+.fin-mat {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-width: 0;
+  min-height: var(--hit);
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fin-mat__img {
+  display: block;
+  width: 100%;
+  height: 60px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 8px;
+  overflow: hidden;
+  object-fit: cover;
+  background: #e9e9e6;
+}
+
+.fin-mat__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* jodełka: wzór na teksturze jest prosty, w scenie obrócony o 45° – miniatura tak samo */
+.fin-mat__img--diag .fin-mat__canvas {
+  transform: rotate(45deg) scale(1.9);
+}
+
+.fin-mat.is-active .fin-mat__img {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.fin-mat__name {
+  font-size: 12px;
+  line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.fin-mat.is-active .fin-mat__name {
+  font-weight: 650;
+}
+
+.fin-mat__size {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- własne płytki */
+
+.fin-file {
+  position: relative;
+  width: 100%;
+  padding: 0 12px;
+  text-align: center;
+}
+
+/* pole pliku jest niewidoczne, ale dostępne z klawiatury i dla czytników; dotyka się etykiety-przycisku */
+.fin-file__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.fin-upload {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.fin-upload__img {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.fin-upload__form {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fin-customs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 12px 8px;
+}
+
+.fin-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fin-danger {
+  color: #b3261e;
+  font-size: 13px;
+}
+
+.fin-danger.is-confirm {
+  background: #b3261e;
+  border-color: #b3261e;
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------- skróty */
+
+.fin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.fin-wide {
+  width: 100%;
+  padding: 0 12px;
+  text-align: center;
+}
+
+.fin .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

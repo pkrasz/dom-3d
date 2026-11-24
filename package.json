@@ -1,0 +1,21 @@
+{
+  "name": "model3d-dom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interaktywny model 3D domu (parter + poddasze) do planowania wykończenia wnętrz",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "happy-dom": "^21.0.4",
+    "vite": "^8.3.8",
+    "vitest": "^4.1.12"
+  }
+}
