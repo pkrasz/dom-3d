@@ -16,7 +16,7 @@ export const SURFACE_COLORS = {
 export const STATIC_COLORS = {
   facade: '#ecebe6', // elewacja jasna
   plinth: '#8d8c88', // cokół
-  roof: '#3a3d42', // dach grafitowy
+  roof: '#3b2a22', // dach głęboki ciemny brąz (wymóg MPZP – nie grafit)
   frame: '#3b3f45', // ramy okien – grafit
   doorExt: '#34383d', // drzwi wejściowe i brama
   doorFrame: '#f7f7f5', // ościeżnice wewnętrzne – białe
@@ -31,7 +31,7 @@ export const STATIC_COLORS = {
   terrain: '#9aa88f',
   paving: '#b9b7b0',
   chimney: '#d9d6cf',
-  chimneyCap: '#55585c',
+  chimneyCap: '#4a382e', // czapy kominów w tonie dachu
   topCap: '#a9a7a1', // wierzch murów (domek dla lalek)
   sectionCap: '#2a2c2f', // przekrój murów (widok z góry)
 };
