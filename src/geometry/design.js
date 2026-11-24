@@ -20,7 +20,10 @@ export const DESIGN_COLORS = {
  * Lamele zamiast balustrad schodów (design.stairs.groundFloorBalustrade = 'slats') albo null.
  *   profile – bok kwadratowego profilu (m), gap – największy odstęp w świetle (do niego dobierana jest liczba lameli),
  *   continuous – lamele ciągłe przez obie kondygnacje (design.stairs.slats.continuous): do sufitu wyższej kondygnacji,
- *                także zamiast balustrad przy otworze klatki; false = tylko bieg dolny, do spodu stropu.
+ *                także zamiast balustrad przy otworze klatki; false = tylko bieg dolny, do spodu stropu,
+ *   atticHeight – dokąd sięgają lamele ciągłe na wyższej kondygnacji (design.stairs.slats.atticHeight):
+ *                'ceiling' (domyślnie) – do sufitu; 'handrail' – ucięte na wysokości balustrady z projektu
+ *                (stairVoid.balustradeHeight) i zakończone poręczą w kolorze lameli.
  */
 export function slatOptions(design) {
   if (design?.stairs?.groundFloorBalustrade !== 'slats') return null;
@@ -30,6 +33,7 @@ export function slatOptions(design) {
     gap: num(o.clearGap, 0.11, 0.05, 0.3),
     color: color(o.color, DESIGN_COLORS.slat),
     continuous: o.continuous === true,
+    atticHeight: o.atticHeight === 'handrail' ? 'handrail' : 'ceiling',
   };
 }
 

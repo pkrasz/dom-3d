@@ -247,7 +247,16 @@ Przycisk w panelu pojawia się sam. Zasady:
 
 `tests/presets.test.js` sprawdza każdą aranżację z rejestru: unikalne `id` mebli, typy i zakresy wymiarów z katalogu, brak kolizji ze ścianami, kominami i schodami, wysokość pod sufitem i skosem, istniejące powierzchnie i materiały pasujące do rodzaju powierzchni, walidację importu bez strat, plik i link tam i z powrotem, a na końcu dodanie z panelu w złożonej aplikacji (wszystkie meble w scenie, wszystkie wykończenia nałożone, bez błędów w konsoli). Wymagania konkretnej aranżacji (łuki drzwi, przejścia 80 cm, nakładanie mebli) mają własne testy: `tests/preset.montana.parter.test.js`, `tests/preset.montana.poddasze.test.js`.
 
-Rozmiar: „Montana” (139 wykończeń, 116 mebli) daje link o długości ok. 4700 znaków przy limicie 6000. Test wymaga co najmniej 500 znaków zapasu – gdy aranżacja urośnie ponad to, trzeba odchudzić dane (mniej drobnych mebli, mniej różnych kolorów ścian), a nie podnosić limit.
+Rozmiar: „Montana” (139 wykończeń, 115 mebli) daje link o długości ok. 4700 znaków przy limicie 6000. Test wymaga co najmniej 500 znaków zapasu – gdy aranżacja urośnie ponad to, trzeba odchudzić dane (mniej drobnych mebli, mniej różnych kolorów ścian), a nie podnosić limit.
+
+### „Montana” – świadome kompromisy (do decyzji właściciela)
+
+Tych życzeń nie da się spełnić w całości przy bryle i zabudowach z projektu. Każdy punkt ma liczby z danych wariantu i jest pilnowany testem – zmiana danych bez zmiany opisu nie przejdzie.
+
+- **Biuro 1/3 – zabudowa A i kanapa.** Z zabudów z projektu w biurze została zabudowa A na ścianie zachodniej; zabudowę B przy ścianie od schodów (D-7; x 5,90..7,91) usunięto na życzenie – na tej ścianie, po lewej ręce siedzącego przy biurku, wisi telewizor (tak samo jak szafa w sypialni 1/9, którą zastąpiła toaletka). Dzięki temu przed złożoną kanapą jest pełne **1,40 × 2,00 m** wolnej podłogi (x 6,25..7,65; y 7,00..9,00) – dawny kompromis 1,40 × 1,35 m zniknął. Zostają dwa drobiazgi: kanapa stoi **35 cm** od niskiej części zabudowy A (na odcinku 85 cm z 1,61 m – dostęp do tej szafy jest tam ciasny), a pod telewizorem **nie ma szafki RTV**: w poprzek pokoju jest 2,93 m, kanapa ze strefą zajmuje 2,85 m, więc nawet najpłytsza szafka (30 cm) skróciłaby wolne miejsce do 1,78 m.
+- **Parter – ścianka szklana wiatrołapu.** Skrzydła (2 × 90 cm) otwierają się do korytarza. Czynne jest **prawe** (od strony salonu): otwarte leży na ścianie i niczego nie zasłania. **Lewe jest bierne** (na ryglu, otwierane okazjonalnie): otwarte na 90° staje 9 cm przed drzwiami łazienki 0/3 i zasłania 57 z 80 cm ich światła – przy otwartym lewym skrzydle drzwi łazienki się nie otworzą. Konsola w wiatrołapie ma 60 × 25 cm i kończy się 37 cm przed ścianką; obok niej pas w osi czynnego skrzydła ma 74 cm, a ostatnie 37 cm przed skrzydłem pełne 90 cm.
+- **Łazienka 1/7 – bidet przy wannie.** Wanna 150 × 80 cm stoi pod skosem przy ścianie nośnej (5 cm luzu) i kończy się 30 cm przed przodem bidetu, więc bok siedzącego jest wolny (min. 37 cm od osi bidetu i WC). Dalej niż 30 cm przed bidetem krawędź wanny biegnie **19 cm od jego osi** (przyjmuje się ok. 40 cm) – miejsce na stopy jest z tej strony węższe. Wzdłuż ściany nie ma zapasu: bidet, WC (osie co 63,5 cm; oś WC 37,5 cm od szafki) i blat dwóch umywalek 1,10 m zajmują ją do końca. Szerzej da się tylko bez bidetu albo z jedną umywalką.
+- **Wanna – bateria.** Model pokazuje czarną baterię na rancie wanny od strony ściany (wysokość bryły mebla to rant + bateria, więc rant wypada 6 cm poniżej wpisanej wysokości). Bateria wolnostojąca albo ścienna to decyzja wykonawcza.
 
 ## Skąd się bierze geometria
 
@@ -266,7 +275,8 @@ Główne części pliku: `meta`, `construction`, `levels` (parter i poddasze: `w
 | Opcja | Co zmienia |
 |---|---|
 | `stairs.groundFloorBalustrade: "slats"` + `stairs.slats` (`profile`, `clearGap`, `color`) | zamiast balustrady biegu dolnego czarne pionowe lamele od stopnic do spodu stropu |
-| `stairs.slats.continuous: true` | lamele ciągłe przez obie kondygnacje: w duszy od stopnic do sufitu poddasza i na krawędziach otworu klatki od posadzki do sufitu – zamiast wszystkich balustrad; wejście na schody i wyjście na korytarz wolne, prześwit najwyżej `clearGap` |
+| `stairs.slats.continuous: true` | lamele ciągłe przez obie kondygnacje: w duszy od stopnic biegu dolnego w górę i na krawędziach otworu klatki na poddaszu – zamiast wszystkich balustrad; wejście na schody i wyjście na korytarz wolne, prześwit najwyżej `clearGap` |
+| `stairs.slats.atticHeight: "handrail"` (wymaga `continuous`) | na poddaszu lamele ucięte na wysokości balustrady z projektu (`stairVoid.balustradeHeight` = 0,90 m) i zakończone czarną poręczą 5 × 4 cm: poziomą na krawędziach otworu klatki (wierzch +3,93) i pochyłą w duszy, równoległą do biegu górnego (0,90 m nad linią nosków, od +2,94 do +3,93; w narożniku przy wyjściu kończy się na bocznym licu poręczy poziomej, x = 7,895 – bryły poręczy się nie przenikają). Parter bez zmian: lamele od stopnic do stropu, a pod otworem klatki przez całą wysokość parteru. Wyjątek widoczny tylko w widoku samego parteru: dwie lamele duszy najbliżej zabiegu (x = 6,37 i 6,50) kończą się pod poręczą pochyłą na +2,94 i +3,03 (ponad spodem stropu +2,70, tuż pod posadzką poddasza), a poręcz, do której dochodzą, należy do poddasza i znika razem z nim. `"ceiling"` albo brak pola = poprzednie zachowanie: wszystkie lamele do sufitu poddasza, bez poręczy. Rzut lameli i kolizje spaceru są w obu wariantach takie same |
 | `stairs.treads` (`tread`, `riser`, `thickness`, `nosing`) | dębowe stopnice na jasnych podstopnicach; rzędne schodów bez zmian |
 | `openCeiling.rooms` (np. `["1/9", "1/10", "1/11"]`) | pomieszczenia bez sufitu płaskiego – skos do kalenicy, ściany do skosu |
 | `openCeiling.beams` (`color`, `enabled`, `collarTies`, `purlins`) | widoczne jętki i płatew w pomieszczeniach otwartych (przekroje i rozstaw przyjęte, nie z projektu więźby) |
@@ -277,7 +287,7 @@ Skutki dla wariantów: w pomieszczeniach otwartych nie ma powierzchni `…:ceili
 
 Drzwi przesuwne a meble: skrzydło jeździ po ścianie, więc przy niej musi zostać wolny pas – cały tor skrzydła plus 5 cm, 12,5 cm od lica ściany. Prostokąty podaje `app.collision.slidingDoors(levelId)` (pole `keepClear`); skrzydło nie należy do `app.collision.walls()`, a przez otwór przechodzi się w spacerze jak przez zwykłe drzwi.
 
-Zmianę opcji sprawdzają `tests/geometry.design.test.js` i `tests/geometry.design2.test.js` (drzwi przesuwne, lamele ciągłe, okna dodatkowe – m.in. te same warunki, które `tools/check.mjs` stawia oknom z projektu).
+Zmianę opcji sprawdzają `tests/geometry.design.test.js` i `tests/geometry.design2.test.js` (drzwi przesuwne, lamele ciągłe i ich poręcze na poddaszu, okna dodatkowe – m.in. te same warunki, które `tools/check.mjs` stawia oknom z projektu).
 
 Narzędzia (uruchamiane w Node, czytają tylko `house.json`):
 

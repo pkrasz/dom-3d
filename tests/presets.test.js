@@ -107,10 +107,11 @@ describe('Montana – złożenie parteru i poddasza', () => {
     }
   });
 
-  it('zachowuje meble z projektu (te same id, typy, położenia i wymiary) – poza szafą w sypialni 1/9, usuniętą na życzenie', () => {
+  it('zachowuje meble z projektu (te same id, typy, położenia i wymiary) – poza szafą w sypialni 1/9 i zabudową B w biurze 1/3, usuniętymi na życzenie', () => {
     const byId = new Map(v.furniture.map((f) => [f.id, f]));
     const geometry = ({ type, levelId, x, y, rot, w, d, h }) => ({ type, levelId, x, y, rot, w, d, h });
-    const REMOVED = ['start-szafa-1-9']; // w jej miejscu toaletka (życzenie właściciela)
+    // życzenia właściciela: w miejscu szafy w sypialni toaletka; w miejscu zabudowy B w biurze (ściana D-7) telewizor
+    const REMOVED = ['start-szafa-1-9', 'start-szafa-1-3-b'];
     for (const id of REMOVED) expect(byId.has(id), id).toBe(false);
     expect(v.furniture.filter((f) => f.id.startsWith('start-'))).toHaveLength(createStarterFurniture().length - REMOVED.length);
     for (const s of createStarterFurniture().filter((f) => !REMOVED.includes(f.id))) {

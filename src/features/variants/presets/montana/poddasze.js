@@ -65,10 +65,10 @@ export const finishes = {
   [sid('1/3', 'ceiling')]: WHITE_WALL,
   [sid('1/3', 'slope-N')]: WHITE_WALL,
   ...walls('1/3', {
-    0: WHITE_WALL, // D-7 od schodów (za zabudową z projektu, z drzwiami)
+    0: WHITE_WALL, // D-7 od schodów: ściana z telewizorem (po lewej ręce siedzącego przy biurku) i z drzwiami
     1: paint(P_GREIGE), // D-8 za regałem z ozdobami (tło za plecami siedzącego przy biurku) – spokojny akcent
     2: WHITE_WALL, // ścianka kolankowa od ogrodu (pod oknami dachowymi, za kanapą)
-    3: WHITE_WALL, // nośna N-1 (za zabudową z projektu)
+    3: WHITE_WALL, // nośna N-1 (za zabudową A z projektu)
   }),
 
   // --- 1/4 Pokój chłopca 10–11 lat
@@ -194,6 +194,8 @@ function item(id, type, rect, back, h, color, extra = {}) {
 export const furniture = [
   // ===== MEBLE Z PROJEKTU (kopie z createStarterFurniture(): id, położenie i wymiary bez zmian, kolory wariantu).
   // Bez 'start-szafa-1-9': zabudowa w sypialni usunięta na życzenie właściciela – w jej miejscu stoi toaletka.
+  // Bez 'start-szafa-1-3-b': zabudowa B w biurze (ściana D-7, x 5,897..7,908) usunięta na życzenie właściciela –
+  // na tej ścianie, po lewej ręce siedzącego przy biurku, wisi telewizor.
   { id: 'start-szafa-1-11-a', type: 'szafa-wnekowa', levelId: LEVEL, x: 3.525, y: 9.5515, rot: 0, w: 1.85, d: 0.597, h: 1.4, color: CASHMERE },
   { id: 'start-szafa-1-11-b-wysoka', type: 'szafa-wnekowa', levelId: LEVEL, x: 4.75, y: 7.7415, rot: 270, w: 1.003, d: 0.6, h: 2.4, color: CASHMERE },
   { id: 'start-szafa-1-11-b-skos-n', type: 'szafa-wnekowa', levelId: LEVEL, x: 4.75, y: 9.0465, rot: 270, w: 1.607, d: 0.6, h: 1.4, color: CASHMERE },
@@ -201,7 +203,6 @@ export const furniture = [
   { id: 'start-szafa-1-8-wysoka', type: 'szafa-wnekowa', levelId: LEVEL, x: 4.75, y: 2.6285, rot: 270, w: 1.543, d: 0.6, h: 2.4, color: WARM_WHITE },
   { id: 'start-szafa-1-3-a-wysoka', type: 'szafa-wnekowa', levelId: LEVEL, x: 5.5985, y: 7.6475, rot: 90, w: 1.191, d: 0.597, h: 2.4, color: WARM_WHITE },
   { id: 'start-szafa-1-3-a-skos-n', type: 'szafa-wnekowa', levelId: LEVEL, x: 5.5985, y: 9.0465, rot: 90, w: 1.607, d: 0.597, h: 1.4, color: WARM_WHITE },
-  { id: 'start-szafa-1-3-b', type: 'szafa-wnekowa', levelId: LEVEL, x: 6.9025, y: 7.3525, rot: 180, w: 2.011, d: 0.601, h: 2.4, color: WARM_WHITE },
   { id: 'start-szafa-1-4', type: 'szafa-wnekowa', levelId: LEVEL, x: 11.449, y: 5.522, rot: 180, w: 3.798, d: 0.58, h: 2.4, color: WARM_WHITE },
 
   // ===== 1/2 KORYTARZ – same drzwi dookoła, więc zostaje pusty: chodnik, lustro na końcu holu, roślina przy lamelach
@@ -210,19 +211,21 @@ export const furniture = [
   item('mt-1-2-lustro', 'lustro', [3.37, 3.82, 3.41, 4.42], 'W', 1.5, BLACK, { z: 0.5 }),
   item('mt-1-2-roslina', 'roslina', [7.95, 6.5, 8.23, 6.78], 'N', 1.3, '#d9cdb8'),
 
-  // ===== 1/3 BIURO (4,11 × 2,93; zabudowy z projektu na ścianie zachodniej i południowej, drzwi w narożniku)
+  // ===== 1/3 BIURO (4,11 × 2,93; zabudowa A z projektu na ścianie zachodniej, drzwi w narożniku południowo-wschodnim)
   // Stanowisko pracy przy ścianie D-8: siedzący ma ZA PLECAMI regał z ozdobami (modele aut), biurko przed sobą,
-  // patrzy w głąb pokoju. Między zabudową a biurkiem zostaje 85 cm przejścia od drzwi.
+  // patrzy na zachód, w głąb pokoju. PO LEWEJ RĘCE ma ścianę D-7 (południową) – tam, gdzie w projekcie stała zabudowa B,
+  // wisi telewizor. Od drzwi do biurka i kanapy prowadzi wolny pas wzdłuż tej ściany.
   item('mt-1-3-regal-ozdoby', 'regal-dekoracyjny', [9.11, 8.35, 9.41, 9.35], 'E', 1.75, OAK, { color2: BLACK }),
   item('mt-1-3-krzeslo', 'krzeslo-biurowe', [8.4, 8.79, 9.02, 9.41], 'E', 1.1, '#3d4045'),
   item('mt-1-3-biurko', 'biurko-komputerowe', [7.7, 8.5, 8.3, 9.7], 'W', 1.25, OAK, { color2: BLACK }),
-  // Kanapa rozkładana (złożona) pod skosem i oknem dachowym, tyłem do ścianki kolankowej. Przed nią wolne 1,40 × 1,35 m
-  // do lica zabudowy – łóżko 1,40 × 2,00 liczone od ścianki kolankowej (razem z kanapą) kończy się 20 cm przed szafami.
-  // Pełne 1,40 × 2,00 m wolnej podłogi PRZED kanapą nie mieści się razem z biurkiem, regałem za krzesłem i szafami.
+  // Kanapa rozkładana (złożona) pod skosem i oknami dachowymi, tyłem do ścianki kolankowej, przodem do telewizora.
+  // PRZED nią wolne 1,40 × 2,00 m (x 6,25..7,65; y 7,00..9,00) – po usunięciu zabudowy B do ściany D-7 jest 2,08 m,
+  // telewizor zabiera 6 cm. Od niskiej części zabudowy A (lico x = 5,897) dzieli ją 35 cm – dostęp do tej szafy jest ciasny.
   item('mt-1-3-kanapa', 'kanapa-rozkladana', [6.25, 9.0, 7.65, 9.85], 'N', 0.85, '#b7a98f'),
-  // Telewizor przy szafach: na licu zabudowy naprzeciw kanapy (stały panel między drzwiami szafy).
-  item('mt-1-3-telewizor', 'telewizor', [6.4, 7.653, 7.5, 7.713], 'S', 0.64, BLACK, { z: 1.0 }),
-  item('mt-1-3-dywan', 'dywan', [6.2, 7.75, 7.6, 8.95], 'N', 0.015, RUG),
+  // Telewizor na ścianie D-7, w osi kanapy (2,02 m od jej frontu), środek ekranu 1,19 m nad posadzką.
+  // Bez szafki RTV pod spodem: najpłytsza (30 cm) skróciłaby wolne miejsce przed kanapą do 1,78 m.
+  item('mt-1-3-telewizor', 'telewizor', [6.35, 6.92, 7.55, 6.98], 'S', 0.68, BLACK, { z: 0.85 }),
+  item('mt-1-3-dywan', 'dywan', [6.25, 7.35, 7.65, 8.95], 'N', 0.015, RUG),
 
   // ===== 1/4 POKÓJ CHŁOPCA 10–11 LAT
   // Łóżko 120 × 200 wezgłowiem do pełnej ściany D-8, wzdłuż ścianki kolankowej (pod skosem).
@@ -232,7 +235,8 @@ export const furniture = [
   // Biurko pod nowym oknem połaciowym OPD1 (światło z góry na blat), przy ściance kolankowej – niskie, okna nie zasłania.
   item('mt-1-4-biurko', 'biurko', [11.68, 9.25, 13.08, 9.85], 'N', 0.75, OAK),
   item('mt-1-4-krzeslo', 'krzeslo-biurowe', [11.75, 8.58, 12.37, 9.2], 'S', 1.1, '#3d4045'),
-  item('mt-1-4-polka', 'polka-wiszaca', [13.1, 7.95, 13.35, 8.95], 'E', 0.2, OAK, { z: 1.35 }),
+  // Półka na książki nad szafką nocną, między regałem a łóżkiem (ściana D-8) – nie wisi nad wolną podłogą ani w przejściu.
+  item('mt-1-4-polka', 'polka-wiszaca', [9.53, 7.7, 9.78, 8.47], 'W', 0.2, OAK, { z: 1.35 }),
   // Środek pokoju wolny – miejsce do zabawy na dywanie.
   item('mt-1-4-dywan', 'dywan', [10.4, 6.2, 12.6, 7.8], 'N', 0.015, '#5d7391'),
 
@@ -256,7 +260,10 @@ export const furniture = [
   item('mt-1-6-regal', 'regal-magazynowy', [7.83, 1.15, 8.23, 2.15], 'W', 2.0, OAK, { color2: BLACK }),
 
   // ===== 1/7 DUŻA ŁAZIENKA (2,41 × 3,15 m ze skosem): wanna pod skosem, prysznic, WC, bidet, DWIE umywalki
-  item('mt-1-7-wanna', 'wanna-wolnostojaca', [5.4, 0.28, 7.0, 1.08], 'S', 0.6, SANITARY),
+  // Wanna 150 × 80 dosunięta do ściany N-1 (5 cm luzu), z czarną baterią na rancie od strony ścianki kolankowej.
+  // Kończy się 30 cm przed przodem bidetu, więc nie stoi przy siedzącym: bok bidetu i WC jest wolny min. 37 cm od osi.
+  // KOMPROMIS: dalej niż 30 cm przed bidetem krawędź wanny jest 19 cm od jego osi (miejsce na stopy węższe z jednej strony).
+  item('mt-1-7-wanna', 'wanna-wolnostojaca', [5.35, 0.28, 6.85, 1.08], 'S', 0.6, SANITARY),
   // Walk-in w narożniku przy drzwiach: ściany z tyłu (N-1, terakota) i z prawej (D-10), wejście od strony wanny.
   item('mt-1-7-prysznic', 'prysznic-walk-in-prawy', [5.3, 2.2, 6.2, 3.4], 'W', 2.0, '#e9e3d8', { color2: BLACK }),
   // Dębowy blat 1,10 m z dwiema terakotowymi umywalkami nablatowymi na ścianie z lastryka; nad nim lustro w czarnej ramie.

@@ -47,7 +47,13 @@ describe('design.json – plik opcji', () => {
     expect(treadOptions({})).toBeNull();
     expect(beamOptions({})).toBeNull();
     expect(slatOptions(undefined)).toBeNull();
-    expect(slatOptions(design)).toEqual({ profile: 0.04, gap: 0.11, color: '#1d1d1f', continuous: true });
+    expect(slatOptions(design)).toEqual({ profile: 0.04, gap: 0.11, color: '#1d1d1f', continuous: true, atticHeight: 'handrail' });
+    // wysokość lameli na poddaszu: tylko 'handrail' ucina je poręczą; brak pola albo inna wartość = do sufitu (jak dawniej)
+    const slatsWith = (atticHeight) => slatOptions({ stairs: { groundFloorBalustrade: 'slats', slats: { continuous: true, atticHeight } } }).atticHeight;
+    expect(slatsWith(undefined)).toBe('ceiling');
+    expect(slatsWith('ceiling')).toBe('ceiling');
+    expect(slatsWith('cokolwiek')).toBe('ceiling');
+    expect(slatsWith('handrail')).toBe('handrail');
     expect(beamOptions(design).collar.underside).toBe(2.65);
     expect(beamOptions({ openCeiling: { rooms: ['1/9'], beams: { enabled: false } } })).toBeNull();
   });

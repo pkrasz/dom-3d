@@ -450,6 +450,25 @@ describe('meble – katalog: typy wariantu „Montana”', () => {
     for (const id of ['scianka-szklana', 'tafla-prysznic', 'prysznic-walk-in']) expect(matsOf(getType(id)).has('glass'), id).toBe(true);
   });
 
+  it('wanna wolnostojąca: czarna bateria na rancie od strony ściany, mieści się w bryle w całym zakresie wymiarów', () => {
+    const t = getType('wanna-wolnostojaca');
+    for (const [w, d, h] of [[t.size.w, t.size.d, t.size.h], [t.range.w[0], t.range.d[0], t.range.h[0]], [t.range.w[1], t.range.d[1], t.range.h[1]]]) {
+      const parts = buildParts(t, w, d, h);
+      const black = parts.filter((p) => p.mat === 'black');
+      expect(black).toHaveLength(2); // korpus + wylewka – tylko dwie bryły
+      for (const p of black) {
+        expect(p.max[2]).toBeLessThanOrEqual(h + 1e-9);
+        expect(p.max[1]).toBeLessThanOrEqual(d / 2 + 1e-9); // środek bryły w (0, 0): tył to +d/2
+        expect(p.min[1]).toBeGreaterThan(0); // po stronie tyłu (ściany)
+        expect(Math.abs(p.min[0] + p.max[0])).toBeLessThan(1e-9); // pośrodku długości
+      }
+      // rant wanny niżej niż wierzch baterii, ale nie niżej niż 46 cm
+      const tub = parts.find((p) => p.shape === 'tube');
+      expect(tub.max[2]).toBeLessThan(Math.max(...black.map((p) => p.max[2])));
+      expect(tub.max[2]).toBeGreaterThanOrEqual(0.46);
+    }
+  });
+
   it('każdy slot koloru jest znany; typy dwukolorowe mają color2 i dwie nazwy, jednokolorowe nie używają slotu „second”', () => {
     for (const t of CATALOG) {
       const mats = matsOf(t);

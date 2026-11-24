@@ -44,7 +44,10 @@
  *               od stopnic biegu dolnego do sufitu poddasza, a na krawędziach otworu klatki na poddaszu od posadzki do sufitu
  *               – zamiast wszystkich balustrad ('poddasze:stairs:balustrade' znika, dochodzi 'poddasze:stairs:slat';
  *               część lameli do posadzki poddasza należy do parteru). Wejście na schody i wyjście na korytarz poddasza
- *               zostają wolne. Kolizje w rzucie jak w projekcie, tylko osłona między biegami leży w linii lameli (y = 5,83);
+ *               zostają wolne. Kolizje w rzucie jak w projekcie, tylko osłona między biegami leży w linii lameli (y = 5,83).
+ *               Z design.stairs.slats.atticHeight = 'handrail' lamele na poddaszu nie idą do sufitu: są ucięte na wysokości
+ *               balustrady z projektu (0,90 m) i zakończone poręczą – poziomą na krawędziach otworu, pochyłą w duszy wzdłuż
+ *               biegu górnego (poręcze są w siatce 'poddasze:stairs:slat'); rzut i kolizje bez zmian;
  *             design.stairs.treads = { tread, riser } – stopnice drewniane i jasne podstopnice (siatki stałe
  *               'parter:stairs:stairTread' / 'stairTreadAlt' / 'stairRiser' zamiast 'stairs' / 'stairsAlt');
  *             design.openCeiling.rooms = ['1/9', …] – w tych pomieszczeniach poddasza nie ma sufitu płaskiego:
@@ -303,7 +306,9 @@ export function createApp({ house, design = {}, container, canvas, uiRoot }) {
     renderer.setSize(w, h, false);
     views.resize(w, h);
     document.documentElement.style.setProperty('--topbar-h', `${Math.round(ui.topInset)}px`);
-    if (!framed) {
+    // Pierwsze kadrowanie dopiero przy sensownym rozmiarze – strona wczytana w ukrytym panelu / karcie w tle
+    // ma przez chwilę 1 px wysokości i kadr liczony z takiego rozmiaru wyrzucał rzut daleko poza dom.
+    if (!framed && w >= 50 && h >= 50) {
       views.frameAll();
       framed = true;
     }

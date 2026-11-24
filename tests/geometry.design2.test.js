@@ -9,7 +9,7 @@ import { buildHouse } from '../src/geometry/buildHouse.js';
 import { buildCollision, moveCircle } from '../src/geometry/collision.js';
 import { pointInRect } from '../src/geometry/plan.js';
 import { roofWindowsOf } from '../src/geometry/roofWindows.js';
-import { slatLayout, distributeSlats, guardSegments, balustradeSegments } from '../src/geometry/stairs.js';
+import { slatLayout, distributeSlats, guardSegments, balustradeSegments, HANDRAIL_EXTRA } from '../src/geometry/stairs.js';
 import { slidingDoorLayout } from '../src/geometry/slidingDoors.js';
 import { slidingDoorOptions, extraRoofWindows, withDesign, rafterAxes } from '../src/geometry/design.js';
 import { WALK_RADIUS } from '../src/geometry/constants.js';
@@ -41,6 +41,8 @@ describe('design.json – nowe opcje', () => {
       expect(note).toMatch(AGREED);
     }
     expect(design.stairs.slats.continuous).toBe(true);
+    expect(design.stairs.slats.atticHeight).toBe('handrail');
+    expect(design.stairs.slats.note).toMatch(/0,90 m/); // wysokość poręczy z projektu jest opisana jako założenie
     expect(design.doors.sliding.map((x) => `${x.level}:${x.id}`)).toEqual(['poddasze:DP1', 'poddasze:DP2', 'parter:DW4']);
     expect(design.extraRoofWindows.windows.map((w) => w.room)).toEqual(['1/4', '1/5', '1/8']);
   });
@@ -238,8 +240,15 @@ describe('drzwi przesuwne „barn” (doors.sliding)', () => {
 
 // ---------------------------------------------------------------- lamele ciągłe
 
-describe('lamele ciągłe przez obie kondygnacje (stairs.slats.continuous)', () => {
+describe('lamele ciągłe przez obie kondygnacje (stairs.slats.continuous), na poddaszu ucięte poręczą (atticHeight = handrail)', () => {
   const { slats, rails, profile } = slatLayout(house, design);
+  const H = upper.stairVoid.balustradeHeight; // 0,90 m – wysokość balustrady z projektu
+  const RAIL_TOP = FLOOR + H; // wierzch poręczy poziomych: +3,93
+  // poprzednie zachowanie (lamele do sufitu poddasza) zostaje jako alternatywna wartość opcji
+  const toCeiling = { ...design, stairs: { ...design.stairs, slats: { ...design.stairs.slats, atticHeight: 'ceiling' } } };
+  const old = slatLayout(house, toCeiling);
+  /** Rzędna wierzchu poręczy linii w duszy: 0,90 m nad linią nosków biegu górnego (x 6,30..7,92: +2,02..+3,03). */
+  const rakedTop = (x) => 2.02 + ((FLOOR - 2.02) * (x - 6.3)) / (7.92 - 6.3) + H;
   const flight = slats.filter((s) => s.line === 'flight');
   const edge = slats.filter((s) => s.line === 'void');
   const along = edge.filter((s) => Math.abs(s.y - 4.8) < 1e-9).sort((a, b) => a.x - b.x); // wzdłuż korytarza
@@ -272,21 +281,119 @@ describe('lamele ciągłe przez obie kondygnacje (stairs.slats.continuous)', () 
     // część do posadzki poddasza należy do parteru, wyżej – do poddasza (znika razem z nim w domku dla lalek)
     expect(lo.geometry.boundingBox.min.z).toBeCloseTo(3.03 / 18, 5);
     expect(lo.geometry.boundingBox.max.z).toBeCloseTo(FLOOR, 5);
-    expect(up.geometry.boundingBox.min.z).toBeCloseTo(FLOOR, 5);
-    expect(up.geometry.boundingBox.max.z).toBeCloseTo(TOP, 5);
-    expect((lo.geometry.attributes.position.count + up.geometry.attributes.position.count) / 3).toBeLessThan(500);
-    expect(rails).toEqual([]); // żadnych profili poziomych
+    // poddasze: lamele od posadzki, nic nie sięga ponad wierzch poręczy (+3,93); sufitu (+5,58) nie dotyka żadna lamela.
+    // Poręcz pochyła linii w duszy schodzi przy zabiegu 13 cm poniżej posadzki poddasza (należy do siatki poddasza).
+    expect(up.geometry.boundingBox.max.z).toBeCloseTo(RAIL_TOP, 5);
+    expect(up.geometry.boundingBox.max.z).toBeLessThan(TOP - 1.6);
+    expect(up.geometry.boundingBox.min.z).toBeGreaterThan(FLOOR - 0.14);
+    expect(up.geometry.boundingBox.min.z).toBeLessThan(FLOOR);
+    expect((lo.geometry.attributes.position.count + up.geometry.attributes.position.count) / 3).toBeLessThan(560);
     expect(profile).toBe(0.04);
+    // wariant 'ceiling': siatka poddasza od posadzki do sufitu, bez poręczy
+    const dOld = buildHouse(house, toCeiling);
+    const upOld = byName(dOld, 'poddasze:stairs:slat');
+    expect(upOld.geometry.boundingBox.min.z).toBeCloseTo(FLOOR, 5);
+    expect(upOld.geometry.boundingBox.max.z).toBeCloseTo(TOP, 5);
+    expect(byName(dOld, 'parter:stairs:slat').geometry.boundingBox.max.z).toBeCloseTo(FLOOR, 5);
   });
 
-  it('linia w duszy: od stopnic biegu dolnego do sufitu poddasza, pod stropem do spodu stropu', () => {
+  it('atticHeight zmienia tylko wysokość lameli na poddaszu: rzut, liczba lameli, parter i kolizje są takie same', () => {
+    expect(old.rails).toEqual([]); // 'ceiling': żadnych poręczy ani profili poziomych
+    expect(old.slats.length).toBe(slats.length);
+    old.slats.forEach((o, i) => {
+      const s = slats[i];
+      expect([s.x, s.y, s.z0, s.underSlab, s.line]).toEqual([o.x, o.y, o.z0, o.underSlab, o.line]);
+      // lamele pod stropem parteru bez zmian; pozostałe w wariancie 'ceiling' idą do sufitu poddasza
+      if (o.underSlab) expect(s.z1).toBe(o.z1);
+      else expect(o.z1).toBeCloseTo(TOP, 9);
+    });
+    expect(guardSegments(house, design)).toEqual(guardSegments(house, toCeiling));
+    for (const levelId of ['parter', 'poddasze']) expect(buildCollision(house, design).walls(levelId)).toEqual(buildCollision(house, toCeiling).walls(levelId));
+    // brak pola = 'ceiling'
+    const { atticHeight, ...noField } = design.stairs.slats;
+    expect(atticHeight).toBe('handrail');
+    expect(slatLayout(house, { ...design, stairs: { ...design.stairs, slats: noField } })).toEqual(old);
+    // parter: zakres siatki poniżej posadzki poddasza jest w obu wariantach ten sam (od stopnic do stropu / przez otwór).
+    // Jedyna różnica w widoku samego parteru: dwie lamele duszy przy zabiegu (x = 6,37 i 6,50), nad którymi poręcz pochyła
+    // leży poniżej posadzki poddasza, kończą się na +2,94 i +3,03 – ponad spodem stropu (+2,70), ale pod posadzką (+3,03);
+    // pozostałe dziesięć pod otworem przechodzi przez całą grubość stropu, jak w wariancie 'ceiling'.
+    const open = slats.filter((s) => s.line === 'flight' && !s.underSlab).sort((a, b) => a.x - b.x);
+    const short = open.filter((s) => s.z1 < FLOOR);
+    expect(short.map((s) => [r3(s.x), r3(s.z1)])).toEqual([[6.368, 2.942], [6.503, 3.026]]);
+    for (const s of short) expect(s.z1).toBeGreaterThan(parter.floorLevel + parter.ceilingHeight + 0.2);
+    expect(open.length - short.length).toBe(10);
+    const loA = byName(d, 'parter:stairs:slat').geometry.boundingBox;
+    const loB = byName(buildHouse(house, toCeiling), 'parter:stairs:slat').geometry.boundingBox;
+    expect(loA.min.toArray()).toEqual(loB.min.toArray());
+    expect(loA.max.toArray()).toEqual(loB.max.toArray());
+  });
+
+  it('poręcze: pozioma na obu krawędziach otworu (+3,93), pochyła w duszy wzdłuż biegu górnego; spotykają się w narożniku', () => {
+    expect(H).toBe(0.9);
+    expect(rails.length).toBe(3);
+    const level = rails.filter((r) => r.line === 'void');
+    const raked = rails.filter((r) => r.line === 'flight');
+    expect(level.length).toBe(2);
+    expect(raked.length).toBe(1);
+    // poziome: na całej długości dawnych balustrad, wierzch 0,90 m nad posadzką poddasza
+    for (const r of level) {
+      expect(r.z).toBe(r.zTo);
+      expect(r.z + profile / 2).toBeCloseTo(RAIL_TOP, 9);
+    }
+    expect(level.map((r) => [r.from, r.to])).toEqual([[[5.3, 4.8], [7.92, 4.8]], [[7.92, 5.8], [7.92, 6.8]]]);
+    // pochyła: w linii lameli duszy, od skrajnej lameli przy zabiegu do narożnika przy wyjściu, 0,90 m nad linią nosków
+    const r = raked[0];
+    expect(r.from[1]).toBeCloseTo(5.83, 9);
+    expect(r.to[1]).toBeCloseTo(5.83, 9);
+    expect(r.from[0]).toBeCloseTo(6.3675 - profile, 9);
+    // w narożniku kończy się na licu poręczy poziomej x = 7,92 (szer. 5 cm: 7,895..7,945) – bryły się nie przenikają
+    const cross = level.find((l) => l.from[0] === l.to[0]);
+    expect(r.to[0]).toBeCloseTo(cross.from[0] - cross.width / 2, 9);
+    expect(r.to[0]).toBeCloseTo(7.895, 9);
+    expect(r.from[1] - r.width / 2).toBeGreaterThan(cross.from[1]); // czoło trafia w bok poręczy poziomej (y 5,805..5,855 w 5,80..6,80)
+    expect(r.from[1] + r.width / 2).toBeLessThan(cross.to[1]);
+    // poręcz wzdłuż korytarza (y = 4,80) kończy się w x = 7,92 i z pozostałymi się nie styka (wyjście ze schodów)
+    expect(r.from[1] - r.width / 2 - 4.8).toBeGreaterThan(0.9);
+    expect(r.z + profile / 2).toBeCloseTo(rakedTop(r.from[0]), 9);
+    expect(r.z + profile / 2).toBeCloseTo(2.94, 2);
+    // nachylenie bez zmian: oś przedłużona do narożnika (x = 7,92) trafia w oś poręczy poziomych; na czole jest 1,6 cm niżej
+    expect(r.zTo + profile / 2).toBeCloseTo(rakedTop(r.to[0]), 9);
+    expect(RAIL_TOP - (r.zTo + profile / 2)).toBeCloseTo((0.025 * (3.03 / 18)) / 0.27, 9);
+    expect(r.zTo + ((7.92 - r.to[0]) * (r.zTo - r.z)) / (r.to[0] - r.from[0])).toBeCloseTo(cross.z, 9);
+    // poręcze poziome kończą się równo z zewnętrznym licem lameli narożnych (nic nie wystaje poza koniec poręczy)
+    expect(along[along.length - 1].x + profile / 2).toBeCloseTo(7.92, 9);
+    expect(over[0].y - profile / 2).toBeCloseTo(5.8, 9);
+    // nachylenie poręczy = nachylenie biegu górnego (stopień 16,83 / 27 cm)
+    expect((r.zTo - r.z) / (r.to[0] - r.from[0])).toBeCloseTo(3.03 / 18 / 0.27, 9);
+    // lamela ucięta poręczą kończy się pod jej wierzchem: na spodzie poręczy poziomej, w osi poręczy pochyłej
+    for (const s of slats.filter((x) => !x.underSlab)) {
+      const top = s.line === 'void' ? RAIL_TOP - profile : rakedTop(s.x) - profile / 2;
+      expect(s.z1, `${s.line} ${s.x.toFixed(2)}`).toBeCloseTo(top, 9);
+    }
+    // poręcz: wysokość profilu lameli, szerokość o 1 cm większa (lica poręczy i lameli nie leżą w jednej płaszczyźnie)
+    for (const x of rails) expect(x.width).toBeCloseTo(profile + HANDRAIL_EXTRA, 9);
+    expect(HANDRAIL_EXTRA).toBe(0.01);
+    // poręcz jest w siatce poddasza (znika razem z nim), profil 4 × 4 cm w kolorze lameli
+    expect(byName(d, 'poddasze:stairs:slat').material.color.getHexString()).toBe('1d1d1f');
+  });
+
+  it('linia w duszy: parter bez zmian (od stopnic, pod stropem do spodu stropu), pod otworem do poręczy biegu górnego', () => {
     expect(flight.length).toBe(16);
     const inVoid = flight.filter((s) => !s.underSlab);
     expect(inVoid.length).toBe(12);
     for (const s of flight) {
       expect(s.y).toBeCloseTo(5.83, 9);
       expect(s.underSlab).toBe(s.x > 7.92);
-      expect(s.z1).toBeCloseTo(s.underSlab ? 2.7 : TOP, 9);
+      if (s.underSlab) expect(s.z1).toBeCloseTo(2.7, 9);
+      else {
+        // przez całą wysokość parteru (żadna nie kończy się niżej niż 9 cm pod posadzką poddasza), najwyżej do +3,93
+        expect(s.z1).toBeGreaterThan(FLOOR - 0.09);
+        expect(s.z1).toBeLessThan(RAIL_TOP);
+        expect(s.z1).toBeLessThan(TOP - 1.6); // nie do sufitu poddasza
+        // osłona biegu górnego: co najmniej 0,88 m nad jego stopnicą w tym miejscu
+        const tread = 2.02 + Math.floor((s.x - 6.3) / 0.27 + 1e-9) * (3.03 / 18);
+        expect(s.z1 - tread, `x = ${s.x.toFixed(2)}`).toBeGreaterThanOrEqual(H - profile / 2 - 1e-9);
+      }
       expect(s.z0).toBeGreaterThan(0.16);
       expect(s.z0).toBeLessThan(1.36);
     }
@@ -297,13 +404,13 @@ describe('lamele ciągłe przez obie kondygnacje (stairs.slats.continuous)', () 
     expect(Math.min(...flight.map((s) => s.y - profile / 2)) - 5.8).toBeLessThan(0.03);
   });
 
-  it('krawędzie otworu klatki na poddaszu: lamele od posadzki do sufitu, rozstaw w świetle ≤ 12 cm', () => {
+  it('krawędzie otworu klatki na poddaszu: lamele od posadzki do poręczy na wysokości balustrady, rozstaw w świetle ≤ 12 cm', () => {
     expect(along.length).toBe(18);
     expect(over.length).toBe(7);
     expect(edge.length).toBe(25);
     for (const s of edge) {
       expect(s.z0).toBeCloseTo(FLOOR, 9);
-      expect(s.z1).toBeCloseTo(TOP, 9);
+      expect(s.z1).toBeCloseTo(RAIL_TOP - profile, 9); // lamela 0,86 m + poręcz 4 cm = 0,90 m
     }
     const h = profile / 2;
     // wzdłuż korytarza: od ściany nośnej (x = 5,30) do narożnika przy wyjściu (x = 7,92)
@@ -324,7 +431,10 @@ describe('lamele ciągłe przez obie kondygnacje (stairs.slats.continuous)', () 
     const arrival = upper.stairVoid.arrival.edge;
     const onArrival = (x, y) => Math.abs(x - arrival[0][0]) < 1e-6 && y > arrival[0][1] && y < arrival[1][1];
     const wallAt = (x, y) => upper.walls.some((w) => pointInRect(x, y, w.rect, 1e-3));
-    const guarded = (x, y) => slats.some((s) => s.z1 > FLOOR + 2 && Math.hypot(s.x - x, s.y - y) <= profile / 2 + GAP);
+    // osłona = lamela sięgająca pod poręcz (0,86 m nad posadzką poddasza + poręcz 4 cm), nie dalej niż o dopuszczalny prześwit
+    const guarded = (x, y) => slats.some((s) => s.line === 'void' && s.z1 >= RAIL_TOP - profile - 1e-9 && Math.hypot(s.x - x, s.y - y) <= profile / 2 + GAP);
+    // bieg górny od strony duszy: lamela linii biegu (z poręczą pochyłą) nie dalej niż o dopuszczalny prześwit
+    const guardedFlight = (x, y) => slats.some((s) => s.line === 'flight' && !s.underSlab && Math.hypot(s.x - x, s.y - y) <= profile / 2 + GAP);
     const [x0, y0, x1, y1] = voidRect;
     const open = [];
     const check = (x, y, ox, oy) => {
@@ -341,7 +451,18 @@ describe('lamele ciągłe przez obie kondygnacje (stairs.slats.continuous)', () 
     }
     expect(open).toEqual([]);
     // bieg górny od strony otworu nad biegiem dolnym (dusza, y = 5,80)
-    for (let x = 6.36; x < x1; x += 0.01) expect(guarded(x, 5.8), `dusza x = ${x.toFixed(2)}`).toBe(true);
+    for (let x = 6.36; x < x1 - 0.03; x += 0.01) expect(guardedFlight(x, 5.8), `dusza x = ${x.toFixed(2)}`).toBe(true);
+    // poręcze nie zostawiają przerw: każda lamela ucięta poręczą leży pod poręczą swojej linii
+    for (const s of slats.filter((x) => !x.underSlab)) {
+      const under = rails.some((r) => r.line === s.line && s.x >= Math.min(r.from[0], r.to[0]) - profile / 2 - 1e-9 && s.x <= Math.max(r.from[0], r.to[0]) + profile / 2 + 1e-9 &&
+        s.y >= Math.min(r.from[1], r.to[1]) - profile / 2 - 1e-9 && s.y <= Math.max(r.from[1], r.to[1]) + profile / 2 + 1e-9);
+      expect(under, `${s.line} ${s.x.toFixed(2)},${s.y.toFixed(2)} bez poręczy`).toBe(true);
+    }
+    // wyjście z biegu górnego: żadna poręcz nie przecina krawędzi x = 7,92 między y 4,82 a 5,80
+    for (const r of rails) {
+      const crossesExit = Math.min(r.from[0], r.to[0]) <= 7.92 && Math.max(r.from[0], r.to[0]) >= 7.92 && Math.min(r.from[1], r.to[1]) < 5.79 && Math.max(r.from[1], r.to[1]) > 4.83;
+      expect(crossesExit).toBe(false);
+    }
     // wyjście z biegu górnego na korytarz (x = 7,92; y 4,80..5,80) i bieg górny: bez lameli
     expect(slats.filter((s) => s.x > 6.3 && s.x < 8.8 && s.y - profile / 2 > 4.8 + 0.021 && s.y + profile / 2 < 5.8)).toEqual([]);
     expect(slats.filter((s) => Math.abs(s.x - 7.92) < 0.03 && s.y > 4.83 && s.y < 5.79)).toEqual([]);

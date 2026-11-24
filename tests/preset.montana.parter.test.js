@@ -252,6 +252,8 @@ describe('Montana / parter – kształt danych', () => {
     expect(finishes['parter:0/1:floor'].id).toBe('patchwork-bialo-czarny');
     const brick = Object.entries(finishes).filter(([id, f]) => id.startsWith('parter:0/1:wall') && f.id === 'cegla-stara-czerwona');
     expect(brick.map(([id]) => id)).toEqual(['parter:0/1:wall:1']);
+    // „reszta ciepła biel”: pozostałe trzy ściany i sufit wiatrołapu w farbie „Biel ciepła” (nie w „Bieli złamanej”)
+    for (const part of ['wall:0', 'wall:2', 'wall:3', 'ceiling']) expect(finishes[`parter:0/1:${part}`], part).toEqual({ kind: 'paint', color: '#f6f1e7' });
   });
 
   it('przechodzi walidację wariantów bez strat', () => {
@@ -446,6 +448,39 @@ describe('Montana / parter – drzwi, okna, przejścia', () => {
     expect(intersecting([x0, y1, x1, y1 + 0.9], (g) => standing(g) && g !== f)).toEqual([]);
   });
 
+  it('ścianka szklana: prawe skrzydło jest czynne – wolne dojście z wiatrołapu, otwarte leży na ścianie i nie blokuje żadnych drzwi', () => {
+    const f = byId.get('mt-p1-scianka-szklana');
+    const [left, right] = glassLeaves(f);
+    const [, y0] = aabb(f);
+    expect(right.r).toBeCloseTo(0.9, 6);
+    // ostatnie 35 cm przed prawym skrzydłem (od strony wiatrołapu) wolne na całą szerokość skrzydła 0,90 m
+    const lane = [right.hinge[0] - right.r, y0 - 0.35, right.hinge[0], y0];
+    expect(intersecting(shrink(lane, 0.001), (g) => standing(g) && g !== f)).toEqual([]);
+    const console_ = aabb(byId.get('mt-p1-konsola'));
+    expect(y0 - console_[3], 'konsola kończy się min. 35 cm przed ścianką').toBeGreaterThanOrEqual(0.35);
+    // obok samej konsoli pas w osi skrzydła ma ≥ 74 cm (po lewej otwarta podłoga wiatrołapu – nic tam nie stoi)
+    expect(console_[0] - (right.hinge[0] - right.r)).toBeGreaterThanOrEqual(0.74);
+    expect(intersecting([lane[0] - 0.6, console_[1], console_[0], y0], (g) => standing(g) && g !== f)).toEqual([]);
+    // osoba 80 cm (koło r = 0,40) mieści się w świetle prawego skrzydła: tuż przed ścianką i w jej osi;
+    // całe dojście przejściem 80 cm od drzwi wejściowych sprawdza siatka w „ciągach komunikacyjnych” (cele „ścianka szklana…”)
+    const cx = right.hinge[0] - right.r / 2;
+    for (const y of [y0, f.y]) {
+      for (const g of furniture) if (standing(g) && g !== f) expect(distToFootprint(g, cx, y), `${g.id} @ y ${y}`).toBeGreaterThanOrEqual(0.4);
+    }
+    // otwarte na 90° prawe skrzydło leży przy pełnej ścianie W3 (nie w otwarciu na salon)
+    const w3 = level.walls.find((w) => w.id === 'W3').rect;
+    expect(w3[0] - right.hinge[0]).toBeLessThanOrEqual(0.1);
+    expect(right.hinge[1] + right.r).toBeLessThanOrEqual(w3[3]);
+    // łuki drzwi rozwiernych korytarza: prawe skrzydło nie koliduje z żadnym…
+    const swing = level.openings.filter((o) => o.kind === 'door' && !slidingIds.has(o.id)).map(leafOf);
+    const openLeaf = (l) => ({ x: l.hinge[0] + l.open[0] * l.r / 2, y: l.hinge[1] + l.open[1] * l.r / 2, rot: 0, w: 0.04, d: l.r });
+    const blocked = (l) => swing.filter((dw) => sectorPoints(dw).some(([x, y]) => inFootprint(openLeaf(l), x, y))).map((dw) => dw.id);
+    expect(blocked(right)).toEqual([]);
+    // …a lewe – ZNANY KOMPROMIS – otwarte na 90° stoi w łuku drzwi łazienki 0/3 (DW5): lewe skrzydło jest bierne,
+    // otwierane okazjonalnie. Gdy ten warunek przestanie być prawdą, trzeba poprawić opis w danych i w README.
+    expect(blocked(left)).toEqual(['DW5']);
+  });
+
   it('drzwi wejściowe, tarasowe i przeszklenie do podłogi mają 80 cm wolnej podłogi; przed bramą stoi tylko quad', () => {
     const big = level.openings.filter((o) => ['entranceDoor', 'glazedDoor', 'garageDoor'].includes(o.kind));
     expect(big.map((o) => o.id).sort()).toEqual(['O3', 'O4', 'O7', 'O8']);
@@ -522,7 +557,9 @@ describe('Montana / parter – ciągi komunikacyjne', () => {
     'kuchnia – przed zlewem': [7.3, 8.6],
     'kuchnia – obejście wyspy od północy': [8.95, 9.45],
     'kuchnia – obejście wyspy od południa': [8.95, 7.45],
-    'wiatrołap – przed konsolą': [8.0, 2.15],
+    'wiatrołap – przed konsolą': [8.0, 2.0],
+    'ścianka szklana – w świetle prawego (czynnego) skrzydła': [8.25, 2.7],
+    'korytarz – tuż za prawym skrzydłem ścianki': [8.25, 3.1],
     'spiżarnia': [4.2, 8.2],
     'garaż – środek': [2.7, 2.0],
     'garaż – przed drzwiami do pom. technicznego': [0.95, 6.3],

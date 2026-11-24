@@ -1,7 +1,8 @@
 // Schody S1 wg levels[0].stairs: biegi proste, stopnie zabiegowe, płyta pod spodem (uproszczona), balustrady.
 // stairModel() daje też funkcje wysokości stopnia i spodu płyty – używa ich tryb spaceru.
 // Opcje bryły (design.json): stopnice drewniane z jasnymi podstopnicami oraz lamele zamiast balustrad
-// (tylko bieg dolny albo – slats.continuous – ciągłe przez obie kondygnacje, także wokół otworu klatki).
+// (tylko bieg dolny albo – slats.continuous – ciągłe przez obie kondygnacje, także wokół otworu klatki;
+// na wyższej kondygnacji do sufitu albo – slats.atticHeight = 'handrail' – ucięte na wysokości balustrady, z poręczą).
 import { pointInPolygon, pointInRect, distanceToRect, EPS } from './plan.js';
 import { ceilingAtPoint } from './levelModel.js';
 import { BALUSTRADE_POST, BALUSTRADE_RAIL, BALUSTRADE_POST_SPACING, BALUSTRADE_SIDE_OFFSET } from './constants.js';
@@ -231,8 +232,23 @@ export function distributeSlats(length, p, gap, postStart, postEnd) {
  *                    Koniec przy ścianie zaczyna się odstępem, koniec wolny – lamelą narożną.
  *   Wyjście z biegu górnego (stairVoid.arrival) i wejście na bieg dolny zostają wolne; profilu poziomego nie ma.
  *
- * Zwraca { slats: [{ x, y, z0, z1, underSlab, line }], rails: [{ from, to, z }], profile } – same dane (testy, podgląd).
+ * Ciągłe z poręczą (dodatkowo slats.atticHeight = 'handrail'): na wyższej kondygnacji lamele nie idą do sufitu,
+ * tylko kończą się poręczą w kolorze lameli, na wysokości balustrady z projektu (stairVoid.balustradeHeight):
+ *   linie 'void'   – od posadzki do poziomej poręczy (wierzch = posadzka + wysokość balustrady), na całej długości krawędzi;
+ *   linia 'flight' – pod otworem klatki od stopnic biegu dolnego do poręczy pochyłej, która idzie równolegle do biegu
+ *                    górnego (wierzch = linia nosków + wysokość balustrady, jak dawna balustrada tego biegu) i w narożniku
+ *                    przy wyjściu dochodzi do lica poręczy poziomej (oś celuje w jej oś; bryły się nie przenikają).
+ *                    Pod stropem bez zmian – do spodu stropu. Skrajne lamele przy zabiegu, gdzie poręcz pochyła leży
+ *                    poniżej posadzki wyższej kondygnacji, kończą się pod tą posadzką (ale ponad spodem stropu).
+ *   Poręcz ma wysokość profilu lameli i jest o HANDRAIL_EXTRA szersza (lica poręczy i lameli nie leżą w jednej płaszczyźnie).
+ *   Pod poręczą poziomą lamela kończy się na jej spodzie (z1 = wierzch − profil), pod pochyłą – w jej osi (z1 = wierzch − pół profilu).
+ *
+ * Zwraca { slats: [{ x, y, z0, z1, underSlab, line }], rails: [{ from, to, z, zTo?, line?, width? }], profile } – same dane
+ * (testy, podgląd). z / zTo = rzędna osi profilu na początku i końcu (bez zTo – profil poziomy); poręcze mają pola line i width.
  */
+/** założenie: o ile poręcz nad lamelami jest szersza od profilu lameli (po 5 mm z każdej strony). */
+export const HANDRAIL_EXTRA = 0.01;
+
 export function slatLayout(house, design = {}) {
   const opt = slatOptions(design);
   const out = { slats: [], rails: [], profile: opt?.profile ?? 0 };
@@ -245,6 +261,16 @@ export function slatLayout(house, design = {}) {
   const upperTop = (x, y) => upper.floorLevel + ceilingAtPoint(upper, design, x, y); // sufit wyższej kondygnacji
   const p = opt.profile;
   const segments = balustradeSegments(house);
+  const handrail = continuous && opt.atticHeight === 'handrail';
+  // oś poręczy nad linią w duszy: po skosie dawnej balustrady biegu górnego (gdy projekt jej nie ma – poziomo nad posadzką)
+  const rakedUp = handrail ? segments.find((s) => s.levelId === upper.id && s.type === 'raked' && s.partIndex !== null) : null;
+  const railSpan = rakedUp ? [Math.min(rakedUp.from[0], rakedUp.to[0]), Math.max(rakedUp.from[0], rakedUp.to[0])] : null;
+  const flightRailZ = (x) => {
+    const height = rakedUp?.height ?? upper.stairVoid?.balustradeHeight ?? level.stairs.balustradeHeight;
+    if (!rakedUp) return upper.floorLevel + height - p / 2;
+    const f = Math.min(1, Math.max(0, (x - rakedUp.from[0]) / (rakedUp.to[0] - rakedUp.from[0])));
+    return rakedUp.zFrom + (rakedUp.zTo - rakedUp.zFrom) * f + height - p / 2;
+  };
   for (const seg of segments) {
     if (seg.levelId !== level.id || !replacedBySlats(house, seg, design)) continue;
     const y = seg.from[1]; // biegi w projekcie idą wzdłuż x (jak w stairModel)
@@ -255,7 +281,7 @@ export function slatLayout(house, design = {}) {
         const x = s.a + ((s.b - s.a) * (i + 0.5)) / n;
         const underSlab = !(voidRect && pointInRect(x, y, voidRect));
         if (!underSlab) open.push(x);
-        const z1 = underSlab ? top : continuous ? upperTop(x, y) : top - p;
+        const z1 = underSlab ? top : handrail ? flightRailZ(x) : continuous ? upperTop(x, y) : top - p;
         out.slats.push({ x, y, z0: s.top, z1, underSlab, line: 'flight' });
       }
     }
@@ -267,10 +293,23 @@ export function slatLayout(house, design = {}) {
       if (voidRect && out.slats.some((sl) => sl.underSlab && sl.x < x0)) x0 = voidRect[0];
       out.rails.push({ from: [x0, y], to: [x1, y], z: top - p / 2 });
     }
+    if (open.length && handrail) {
+      // poręcz: od skrajnej lameli przy zabiegu do narożnika przy wyjściu z biegu górnego (tam schodzi się z poręczami poziomymi)
+      // (przy zabiegu wystaje pół profilu poza skrajną lamelę)
+      const x0 = Math.min(...open) - p;
+      let x1 = railSpan ? Math.max(railSpan[1], Math.max(...open) + p / 2) : Math.max(...open) + p / 2;
+      // w narożniku kończy się na licu poręczy poziomej, która biegnie w poprzek (bryły poręczy się nie przenikają);
+      // nachylenie bez zmian – oś poręczy pochyłej nadal celuje w oś poręczy poziomej w narożniku
+      const width = p + HANDRAIL_EXTRA;
+      const across = segments.some((s) => s.levelId === upper.id && s.type === 'level' && Math.abs(s.from[0] - s.to[0]) < EPS
+        && Math.abs(s.from[0] - x1) < EPS && y > Math.min(s.from[1], s.to[1]) - width / 2 && y < Math.max(s.from[1], s.to[1]) + width / 2);
+      if (across) x1 -= width / 2;
+      out.rails.push({ from: [x0, y], to: [x1, y], z: flightRailZ(x0), zTo: flightRailZ(x1), line: 'flight', width });
+    }
   }
   if (!continuous) return out;
 
-  // krawędzie otworu klatki na wyższej kondygnacji: lamele od posadzki do sufitu, w osi dawnej balustrady
+  // krawędzie otworu klatki na wyższej kondygnacji: lamele od posadzki do sufitu (albo do poręczy), w osi dawnej balustrady
   const atWall = ([x, y]) => upper.walls.some((w) => distanceToRect(x, y, w.rect) < 1e-3);
   for (const seg of segments) {
     if (seg.levelId !== upper.id || seg.type !== 'level') continue;
@@ -280,7 +319,11 @@ export function slatLayout(house, design = {}) {
     for (const t of distributeSlats(length, p, opt.gap, !atWall(seg.from), !atWall(seg.to))) {
       const x = seg.from[0] + ux * t;
       const y = seg.from[1] + uy * t;
-      out.slats.push({ x, y, z0: seg.zFrom, z1: upperTop(x, y), underSlab: false, line: 'void' });
+      out.slats.push({ x, y, z0: seg.zFrom, z1: handrail ? seg.zFrom + seg.height - p : upperTop(x, y), underSlab: false, line: 'void' });
+    }
+    if (handrail) {
+      const z = seg.zFrom + seg.height - p / 2;
+      out.rails.push({ from: [...seg.from], to: [...seg.to], z, zTo: z, line: 'void', width: p + HANDRAIL_EXTRA });
     }
   }
   return out;
@@ -327,5 +370,6 @@ export function emitBalustrades(house, batch, design = {}) {
       (s.z0 >= cut - EPS ? bUp : b).box(s.x - h, s.y - h, s.z0, s.x + h, s.y + h, s.z1, ['bottom', 'top']);
     }
   }
-  for (const r of rails) b.bar([...r.from, r.z], [...r.to, r.z], profile, profile);
+  // profil spinający lamele pod stropem należy do niższej kondygnacji, poręcze (pole line) – do wyższej
+  for (const r of rails) (r.line ? bUp : b).bar([...r.from, r.z], [...r.to, r.zTo ?? r.z], r.width ?? profile, profile);
 }

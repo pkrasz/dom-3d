@@ -33,12 +33,12 @@ const ZYWICA = material('posadzka-zywica-szara');
 // ---------------------------------------------------------------- wykończenia
 /** @type {Object<string, import('../../../../app/variant.js').Finish>} */
 export const finishes = {
-  // --- 0/1 Wiatrołap: patchwork biało-czarny, ściana boczna (wschodnia, bez szafy) w starej cegle
+  // --- 0/1 Wiatrołap: patchwork biało-czarny, ściana boczna (wschodnia, bez szafy) w starej cegle, reszta „Biel ciepła”
   'parter:0/1:floor': material('patchwork-bialo-czarny'),
-  'parter:0/1:wall:0': farba(BIEL_ZLAMANA), // południowa, z drzwiami wejściowymi
+  'parter:0/1:wall:0': farba(BIEL_CIEPLA), // południowa, z drzwiami wejściowymi
   'parter:0/1:wall:1': material('cegla-stara-czerwona'), // wschodnia (ściana W3 od salonu) – przy niej siedzisko i konsola
-  'parter:0/1:wall:2': farba(BIEL_ZLAMANA), // północna – szafa wnękowa, dalej ścianka szklana
-  'parter:0/1:wall:3': farba(BIEL_ZLAMANA), // zachodnia, z drzwiami do garażu
+  'parter:0/1:wall:2': farba(BIEL_CIEPLA), // północna – szafa wnękowa, dalej ścianka szklana
+  'parter:0/1:wall:3': farba(BIEL_CIEPLA), // zachodnia, z drzwiami do garażu
   'parter:0/1:ceiling': farba(BIEL_CIEPLA),
 
   // --- 0/2 Korytarz
@@ -119,18 +119,24 @@ export const furniture = [
   { id: 'start-szafa-wiatrolap', type: 'szafa-wnekowa', levelId: P, x: 5.9, y: 2.35, rot: 0, w: 1.2, d: 0.6, h: 2.4, color: BIEL_MEBLI },
   // ścianka szklana w przejściu P1 (1,98 × 2,70 – pełna wysokość), drzwi dwuskrzydłowe 2 × 90 cm; 2 mm luzu na ościeża.
   // ZAŁOŻENIE: skrzydła otwierają się do korytarza (+y) – dzięki temu ceglana ściana wiatrołapu mieści siedzisko i konsolę.
+  // Skrzydło CZYNNE (codzienne przejście 0,90 m) to PRAWE, od strony salonu: otwarte składa się na ścianę W3 (x = 8,71,
+  // y 2,75..3,65) i niczego nie zasłania. Skrzydło LEWE jest BIERNE (na ryglu, otwierane okazjonalnie – np. przy wnoszeniu
+  // mebli): otwarte na 90° staje 9 cm przed drzwiami łazienki 0/3 i zasłania 57 z 80 cm ich światła (KOMPROMIS, README).
   { id: 'mt-p1-scianka-szklana', type: 'scianka-szklana-drzwi', levelId: P, x: 7.81, y: 2.71, rot: 0, w: 1.978, d: 0.08, h: 2.7, color: CZARNY },
   // siedzisko przy ceglanej ścianie, na prawo od wejścia; nad nim listwa z hakami
   { id: 'mt-p1-siedzisko', type: 'siedzisko', levelId: P, x: 8.61, y: 1.27, rot: 270, w: 0.8, d: 0.38, h: 0.46, color: DAB, color2: BIEL_MEBLI },
   { id: 'mt-p1-wieszak', type: 'wieszak', levelId: P, x: 8.76, y: 1.27, rot: 270, w: 0.8, d: 0.08, h: 0.14, color: DAB, z: 1.6 },
-  // konsola z dębowym blatem W WIATROŁAPIE – dalej na tej samej ceglanej ścianie, przy ściance szklanej; nad nią okrągłe lustro w czarnej ramie
-  { id: 'mt-p1-konsola', type: 'konsola', levelId: P, x: 8.66, y: 2.18, rot: 270, w: 0.8, d: 0.28, h: 0.8, color: DAB, color2: CZARNY },
-  { id: 'mt-p1-lustro-konsola', type: 'lustro-okragle', levelId: P, x: 8.78, y: 2.18, rot: 270, w: 0.65, d: 0.04, h: 0.65, color: CZARNY, z: 1.05 },
+  // konsola z dębowym blatem W WIATROŁAPIE – na tej samej ceglanej ścianie, tuż za siedziskiem; nad nią okrągłe lustro
+  // w czarnej ramie. Krótka (60 cm), płytka (25 cm) i odsunięta 37 cm od ścianki szklanej: ostatnie 37 cm przed czynnym
+  // (prawym) skrzydłem jest wolne na całą jego szerokość 0,90 m; obok samej konsoli pas w osi skrzydła ma 74 cm, a po
+  // lewej jest otwarta podłoga wiatrołapu (wcześniej konsola 80 × 28 cm zwężała dojście do 71 cm aż do 9 cm przed drzwiami).
+  { id: 'mt-p1-konsola', type: 'konsola', levelId: P, x: 8.675, y: 2, rot: 270, w: 0.6, d: 0.25, h: 0.8, color: DAB, color2: CZARNY },
+  { id: 'mt-p1-lustro-konsola', type: 'lustro-okragle', levelId: P, x: 8.78, y: 2, rot: 270, w: 0.55, d: 0.04, h: 0.55, color: CZARNY, z: 1.1 },
   // wysokie lustro w czarnej ramie na ścianie przy drzwiach wejściowych (4 cm – nie wchodzi w łuk drzwi z garażu)
   { id: 'mt-p1-lustro', type: 'lustro', levelId: P, x: 5.95, y: 0.87, rot: 180, w: 0.6, d: 0.04, h: 1.6, color: CZARNY, z: 0.35 },
   { id: 'mt-p1-dywan', type: 'dywan-okragly', levelId: P, x: 7.45, y: 1.7, rot: 0, w: 1.4, d: 1.4, h: 0.015, color: JUTA },
 
-  // ============ 0/2 Korytarz: pusty ciąg komunikacyjny (za ścianką szklaną otwierają się jej skrzydła)
+  // ============ 0/2 Korytarz: pusty ciąg komunikacyjny (za ścianką szklaną otwiera się jej czynne, prawe skrzydło)
   // roślina w otwartej wnęce pod biegiem górnym schodów (poza ciągiem komunikacyjnym)
   { id: 'mt-p2-roslina', type: 'roslina', levelId: P, x: 7.05, y: 5.15, rot: 0, w: 0.45, d: 0.45, h: 1.3, color: '#d9cdb8' },
 

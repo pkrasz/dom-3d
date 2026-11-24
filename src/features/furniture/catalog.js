@@ -710,9 +710,13 @@ export const CATALOG = [
     id: 'wanna-wolnostojaca', name: 'Wanna wolnostojąca', category: 'lazienka',
     size: { w: 1.7, d: 0.8, h: 0.6 }, range: { w: [1.4, 1.9], d: [0.7, 0.9], h: [0.52, 0.68] }, color: '#f4f4f1',
     build(b, w, d, h) {
-      b.tube(w / 2, d / 2, w / 2, d / 2, 0, h, 'main');
+      const rim = h - 0.06; // rant wanny; wyżej już tylko czarna bateria
+      b.tube(w / 2, d / 2, w / 2, d / 2, 0, rim, 'main');
       b.ell(w / 2, d / 2, w * 0.45, d * 0.45, 0, h * 0.25, 'main'); // dno
       b.cyl(w / 2, d / 2, 0.025, h * 0.25, h * 0.25 + 0.004, 'steel'); // odpływ
+      // czarna bateria na rancie, pośrodku dłuższego boku od strony TYŁU (ściany); wylewka nad wodę
+      b.cyl(w / 2, d - 0.03, 0.016, rim, h, 'black');
+      b.box(w / 2 - 0.012, d - 0.17, h - 0.025, w / 2 + 0.012, d - 0.03, h, 'black');
     },
   },
   {
